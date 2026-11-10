@@ -1,0 +1,4 @@
+# 규칙 파일·키는 GitHub에 올리지 않음
+CLAUDE.md
+UI.md
+.env.local

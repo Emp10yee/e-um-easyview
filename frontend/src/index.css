@@ -1,0 +1,6 @@
+@import "tailwindcss";
+
+/* 기본 폰트를 Pretendard로 */
+@theme {
+  --font-sans: Pretendard, -apple-system, "Noto Sans KR", sans-serif;
+}
