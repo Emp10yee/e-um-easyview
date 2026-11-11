@@ -20,12 +20,15 @@ npm run dev
 
 ## 환경변수
 
-이 폴더의 `.env.example`을 `.env`로 복사해 `GEMINI_API_KEY`를 설정합니다. **환경변수 파일 위치는 `backend/.env`입니다.** 저장소 루트에서 실행해도 backend 폴더의 파일을 읽습니다. 키가 없어도 상태 API와 기존 시연 화면은 이용할 수 있습니다.
+이 폴더의 `.env.example`을 `.env`로 복사해 `BAZE_API_KEY`를 설정합니다. **환경변수 파일 위치는 `backend/.env`입니다.** 저장소 루트에서 실행해도 backend 폴더의 파일을 읽습니다. 키가 없어도 상태 API와 기존 시연 화면은 이용할 수 있습니다.
+
+학교 SnowChat Gateway 키를 사용합니다. `BAZE_MODEL=google/gemma-4-31B-it`, `BAZE_BASE_URL=https://factchat-cloud.mindlogic.ai/v1/gateway`가 기본값입니다. 직접 호출용 Google 키는 사용하지 않습니다. 현재 학교 키에서 Gemma 4 모델 목록 조회와 테스트 이미지의 JSON 응답을 확인했으며 실제 키오스크 사진 정확도는 추가 검증이 필요합니다.
 
 ## 구조
 
 - `src/server.mjs`: 서버 실행 및 포트 오류 안내
-- `src/app.mjs`: HTTP 라우팅, CORS, Gemini 호출 및 오류 처리
+- `src/app.mjs`: HTTP 라우팅, CORS, BAZE Gateway 호출 및 오류 처리
+- `src/lib/gateway.mjs`: BAZE 이미지·JSON 요청 생성 및 Chat Completions 응답 파싱
 - `src/lib/request.mjs`: 사진·사전 설정·후속 선택 입력 검증 및 정규화
 - `src/lib/guide.mjs`: 안내 프롬프트 및 AI 응답 검증
 - `test/guide.test.mjs`: 응답 검증 및 기존 시연 계약 테스트

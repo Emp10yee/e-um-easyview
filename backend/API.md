@@ -7,7 +7,7 @@
 ## 경로와 실행
 
 - 개발: `npm run dev:backend` → `http://127.0.0.1:3000`
-- GET `/api/status`: `{ "configured": true }`. API 키 존재 여부이며 유효성·할당량 확인은 아닙니다.
+- GET `/api/status`: `{ "configured": true, "provider": "baze", "model": "google/gemma-4-31B-it" }`. API 키 존재 여부이며 유효성·할당량 확인은 아닙니다.
 - POST `/api/analyze`: 현재 화면과 주문 목표 분석
 - 과거 `/api/v1/tasks/...` 설계는 미구현입니다. 세션·Firestore·서버 주문 이력 저장은 없습니다.
 
@@ -159,11 +159,16 @@ kind=ask 응답의 message와 choices를 보여 주고 사용자가 답하면 co
 | 415 | UNSUPPORTED_MEDIA_TYPE | application/json으로 전송 |
 | 429 | RATE_LIMITED / AI_RATE_LIMITED | Retry-After: 5 이후 사용자가 다시 시도 |
 | 503 | AI_NOT_CONFIGURED | 서버 API 키 설정 |
+| 503 | AI_BUSY | Gateway 모델 일시적 혼잡. 잠시 후 다시 시도 |
+| 503 | AI_CREDITS_EXHAUSTED | 학교 크레딧 잔액 확인 |
+| 502 | AI_MODEL_NOT_FOUND | BAZE_MODEL이 현재 계정에서 사용 가능한지 확인 |
+| 502 | AI_AUTH_FAILED / AI_REQUEST_REJECTED | 키·프로젝트 권한·모델 입력 지원 확인 |
 | 502 | AI_UNAVAILABLE / AI_INVALID_RESPONSE | 재시도·재촬영 안내 |
 | 504 | AI_TIMEOUT | 재시도·재촬영 안내 |
 | 500 | INTERNAL_ERROR | 서버 설정·로그 확인 |
 
-서버 Gemini 호출 제한 시간은 55초입니다. 프런트 TODO의 8초 제한은 이보다 짧으므로 연동 시 65초 등 여유 있는 클라이언트 제한으로 조율하세요. 모델의 kind·좌표·메시지는 서버 검증을 통과해야 하며 명세 구조 검증이 실제 인식 정확도를 보장하지는 않습니다.
+서버 BAZE Gateway 호출 제한 시간은 55초입니다. 프런트 TODO의 8초 제한은 이보다 짧으므로 연동 시 65초 등 여유 있는 클라이언트 제한으로 조율하세요. 모델의 kind·좌표·메시지는 서버 검증을 통과해야 하며 명세 구조 검증이 실제 인식 정확도를 보장하지는 않습니다.
+
 
 ## 개발 출처 및 배포
 
@@ -179,5 +184,23 @@ FRONTEND_ORIGINS=https://frontend.example.com
 
 - 요청 정규화, 선택 문맥 전달, 안내 종류·좌표 검증, 오류·CORS·동시 요청 처리: 자동 테스트 추가
 - 기존 시연 응답 호환: 테스트 확인
-- 실제 Gemini 호출·스타벅스/학식 사진 인식: 키와 사진이 없어 미검증
+- 실제 BAZE Gateway 호출·스타벅스/학식 사진 인식: 키와 사진이 없어 미검증
 - React 실제 API 호출 및 현장 PC 시연: 후속 작업
+
+## 학교 Gateway 연결 설정
+
+Google Gemini 직접 호출을 제거하고 학교 BAZE의 Chat Completions 경로로 전환했습니다. `backend/.env`에 다음을 설정한 뒤 서버를 재시작하세요.
+
+```dotenv
+BAZE_API_KEY=학교에서_발급받은_키
+BAZE_BASE_URL=https://factchat-cloud.mindlogic.ai/v1/gateway
+BAZE_MODEL=google/gemma-4-31B-it
+```
+
+Bearer 인증, messages의 text/image_url(data URL), strict json_schema 요청을 사용합니다. 응답은 choices[0].message.content에서 읽고 finish_reason=stop, 거부 응답 없음, JSON 구조 및 좌표 검증을 모두 통과해야 성공으로 반환합니다.
+
+Gemma 4는 학교 키의 모델 목록에 표시되는 것을 확인했고, 1픽셀 테스트 이미지를 전송해 HTTP 200 및 kind=retake를 확인했습니다. 이 테스트는 이미지 전송·응답 구조의 호환성만 확인하며 한국어 메뉴 인식·추천·버튼 위치 정확도를 보장하지 않습니다. 실제 스타벅스·학식 사진으로 후속 검증해야 합니다.
+
+기존 Gemini 환경변수는 더 이상 사용하지 않습니다. 학교 키를 Gemini 키 변수에 넣지 마세요. 크레딧은 학교 키를 발급한 계정에서 차감됩니다. 이미지 전송 대상은 학교 Gateway 및 해당 모델 제공업체입니다. 본 서비스의 API 경로와 프런트에 반환하는 필드는 유지합니다.
+
+참고: [학교 모델 목록](https://docs.mindlogic.ai/docs/sookmyung/api-gateway/getting-started/models), [학교 Chat Completions](https://docs.mindlogic.ai/docs/sookmyung/api-gateway/reference/chat-completions), [Gemma 4 공식 설명](https://ai.google.dev/gemma/docs/core).
