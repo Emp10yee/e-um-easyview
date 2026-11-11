@@ -88,7 +88,7 @@ export const MOCK_ANSWERS: Record<string, GuideStep> = {
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 // 화면은 이 함수만 호출. 더 안내할 게 없으면 null(=주문 끝)
-// TODO: 실제 API 연동 → POST /tasks/{taskId}/analyses (Gemini)
+// TODO: 실제 API 연동 → POST /tasks/{taskId}/analyses (BAZE Gateway)
 export async function analyzeFrame(imageBase64: string, ctx: Ctx, stepIndex: number): Promise<GuideStep | null> {
   try {
     // TODO: 실제 API 연동 (8초 타임아웃, 응답은 JSON만 받도록 프롬프트에 고정)

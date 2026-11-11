@@ -21,7 +21,7 @@ const steps = [
 ];
 const stageTitles = { place: '포장·매장 선택', menu: '메뉴 선택', payment: '결제 안내', complete: '주문 완료' };
 const state = { screen: 'setup', step: 0, settings: { place: '', store: '', category: '', payment: '' }, custom: '', mode: 'real', demoType: 'cafe', stage: 'place', result: null, image: '', selected: 0, busy: false, error: '', configured: false, sound: false };
-let stream, generation = 0;
+let stream, generation = 0, selectedCameraId = '';
 
 function say(text) {
   if (!state.sound || !('speechSynthesis' in window)) return;
@@ -74,7 +74,7 @@ function renderGuide() {
   const result = state.result;
   const selected = result?.candidates[state.selected];
   const complete = result?.stage === 'complete';
-  app.innerHTML = `<section class="guide-shell"><div class="guide-top"><div><span class="eyebrow">${state.mode === 'demo' ? '시연 안내' : '촬영 안내'}</span><h1 tabindex="-1">${state.mode === 'demo' ? '예시 화면으로 연습하기' : '키오스크 화면을 보여 주세요'}</h1></div><button class="quiet" id="edit">설정 변경</button></div><div class="order-summary"><span>${escape(state.settings.place)}</span><span>${escape(actualSettings().category)}</span><span>${escape(state.settings.payment)}</span></div><div class="guide-content"><section class="camera-panel" aria-label="키오스크 화면"><div class="camera-bar"><span class="live-dot"></span><strong>${state.mode === 'demo' ? '시연 모드 · 가상 화면' : state.image ? '촬영한 화면' : '카메라 / 사진'}</strong><span class="stage-badge">${stageTitles[state.stage]}</span></div><div class="viewfinder" id="viewfinder">${state.image ? `<img id="kiosk-image" src="${state.image}" alt="${state.mode === 'demo' ? '시연용 가상 키오스크' : '촬영한 키오스크'} 화면"><div id="target" class="target" hidden><span>여기를 눌러 주세요</span></div>` : `<div class="camera-placeholder"><div class="scan-icon" aria-hidden="true">⌗</div><h2>키오스크 화면을<br>네모 안에 담아 주세요</h2><p>화면 전체가 잘 보이게 촬영해 주세요.</p><button class="primary" id="open-camera">카메라 켜기</button><button class="quiet" id="upload-empty">저장된 사진 선택</button></div>`}</div><div class="camera-tools">${state.mode === 'demo' ? `<button class="camera-button" id="demo-cafe" aria-pressed="${state.demoType === 'cafe'}">카페 예시</button><button class="camera-button" id="demo-meal" aria-pressed="${state.demoType === 'meal'}">학식 예시</button>` : `<button class="camera-button" id="capture-photo" ${state.busy ? 'disabled' : ''}>◉ 화면 촬영</button><button class="camera-button" id="upload" ${state.busy ? 'disabled' : ''}>＋ 사진 선택</button>`}</div>${state.mode === 'demo' ? '<p class="camera-caption">실제 스타벅스·학식 사진이 아닌 시연용 화면입니다.</p>' : '<p class="camera-caption">사진 분석 시 촬영 이미지가 Google Gemini로 전송됩니다.</p>'}</section><section class="guidance" aria-label="다음 행동 안내"><div class="guide-progress">${Object.entries(stageTitles).map(([key, label], i) => `<span class="${state.stage === key ? 'active' : ''}" ${state.stage === key ? 'aria-current="step"' : ''}>${i + 1} ${label}</span>`).join('')}</div><div class="instruction" role="status" aria-live="polite"><div class="instruction-icon" aria-hidden="true">${state.busy ? '◌' : complete ? '✓' : '↖'}</div><div><p class="eyebrow">${state.error ? '다시 확인해 주세요' : state.busy ? '화면을 확인하고 있어요' : complete ? '마지막으로 확인해 주세요' : selected ? '지금은 이렇게 해 보세요' : '한 번에 한 걸음'}</p><h2>${state.busy ? '누를 곳을 찾고 있어요…' : escape(guideMessage())}</h2></div></div>${result?.candidates.length > 1 && !state.error && !state.busy ? `<div class="alternatives"><p>다른 메뉴를 원하시나요?</p><div class="chips">${result.candidates.map((c, i) => `<button data-candidate="${i}" class="chip ${i === state.selected ? 'chosen' : ''}" aria-pressed="${i === state.selected}">${escape(c.label)}${i === 0 ? ' · 기본 추천' : ''}</button>`).join('')}</div></div>` : ''}<div class="guide-actions">${complete ? '<button class="primary" id="finish">확인했어요 · 처음으로</button>' : state.mode === 'demo' ? `<button class="primary" id="demo-next" ${result?.candidates.length ? '' : 'disabled'}>눌렀어요 · 다음 화면 →</button>` : `<button class="primary" id="next-photo" ${state.busy ? 'disabled' : ''}>${state.image ? '다음 화면 촬영하기' : '키오스크 촬영하기'} →</button>`}<button class="secondary" id="read-guide">♬ 안내 듣기</button></div><div class="mode-note">${state.mode === 'demo' ? '실제 키오스크에서는 안내된 위치를 직접 눌러 주세요.' : state.configured ? '키오스크를 누른 후 바뀐 화면을 다시 촬영해 주세요.' : '사진 분석 연결이 필요해요. 시연 모드로 먼저 체험할 수 있어요.'}<button class="text-button" id="toggle-mode">${state.mode === 'demo' ? '실제 사진으로 안내받기' : '시연 모드로 연습하기'} →</button></div></section></div></section>`;
+  app.innerHTML = `<section class="guide-shell"><div class="guide-top"><div><span class="eyebrow">${state.mode === 'demo' ? '시연 안내' : '촬영 안내'}</span><h1 tabindex="-1">${state.mode === 'demo' ? '예시 화면으로 연습하기' : '키오스크 화면을 보여 주세요'}</h1></div><button class="quiet" id="edit">설정 변경</button></div><div class="order-summary"><span>${escape(state.settings.place)}</span><span>${escape(actualSettings().category)}</span><span>${escape(state.settings.payment)}</span></div><div class="guide-content"><section class="camera-panel" aria-label="키오스크 화면"><div class="camera-bar"><span class="live-dot"></span><strong>${state.mode === 'demo' ? '시연 모드 · 가상 화면' : state.image ? '촬영한 화면' : '카메라 / 사진'}</strong><span class="stage-badge">${stageTitles[state.stage]}</span></div><div class="viewfinder" id="viewfinder">${state.image ? `<img id="kiosk-image" src="${state.image}" alt="${state.mode === 'demo' ? '시연용 가상 키오스크' : '촬영한 키오스크'} 화면"><div id="target" class="target" hidden><span>여기를 눌러 주세요</span></div>` : `<div class="camera-placeholder"><div class="scan-icon" aria-hidden="true">⌗</div><h2>키오스크 화면을<br>네모 안에 담아 주세요</h2><p>화면 전체가 잘 보이게 촬영해 주세요.</p><button class="primary" id="open-camera">카메라 켜기</button><button class="quiet" id="upload-empty">저장된 사진 선택</button></div>`}</div><div class="camera-tools">${state.mode === 'demo' ? `<button class="camera-button" id="demo-cafe" aria-pressed="${state.demoType === 'cafe'}">카페 예시</button><button class="camera-button" id="demo-meal" aria-pressed="${state.demoType === 'meal'}">학식 예시</button>` : `<button class="camera-button" id="capture-photo" ${state.busy ? 'disabled' : ''}>◉ 화면 촬영</button><button class="camera-button" id="upload" ${state.busy ? 'disabled' : ''}>＋ 사진 선택</button>`}</div>${state.mode === 'demo' ? '<p class="camera-caption">실제 스타벅스·학식 사진이 아닌 시연용 화면입니다.</p>' : '<p class="camera-caption">사진 분석 시 촬영 이미지가 학교 BAZE Gateway와 선택한 모델 제공업체로 전송됩니다.</p>'}</section><section class="guidance" aria-label="다음 행동 안내"><div class="guide-progress">${Object.entries(stageTitles).map(([key, label], i) => `<span class="${state.stage === key ? 'active' : ''}" ${state.stage === key ? 'aria-current="step"' : ''}>${i + 1} ${label}</span>`).join('')}</div><div class="instruction" role="status" aria-live="polite"><div class="instruction-icon" aria-hidden="true">${state.busy ? '◌' : complete ? '✓' : '↖'}</div><div><p class="eyebrow">${state.error ? '다시 확인해 주세요' : state.busy ? '화면을 확인하고 있어요' : complete ? '마지막으로 확인해 주세요' : selected ? '지금은 이렇게 해 보세요' : '한 번에 한 걸음'}</p><h2>${state.busy ? '누를 곳을 찾고 있어요…' : escape(guideMessage())}</h2></div></div>${result?.candidates.length > 1 && !state.error && !state.busy ? `<div class="alternatives"><p>다른 메뉴를 원하시나요?</p><div class="chips">${result.candidates.map((c, i) => `<button data-candidate="${i}" class="chip ${i === state.selected ? 'chosen' : ''}" aria-pressed="${i === state.selected}">${escape(c.label)}${i === 0 ? ' · 기본 추천' : ''}</button>`).join('')}</div></div>` : ''}<div class="guide-actions">${complete ? '<button class="primary" id="finish">확인했어요 · 처음으로</button>' : state.mode === 'demo' ? `<button class="primary" id="demo-next" ${result?.candidates.length ? '' : 'disabled'}>눌렀어요 · 다음 화면 →</button>` : `<button class="primary" id="next-photo" ${state.busy ? 'disabled' : ''}>${state.image ? '다음 화면 촬영하기' : '키오스크 촬영하기'} →</button>`}<button class="secondary" id="read-guide">♬ 안내 듣기</button></div><div class="mode-note">${state.mode === 'demo' ? '실제 키오스크에서는 안내된 위치를 직접 눌러 주세요.' : state.configured ? '키오스크를 누른 후 바뀐 화면을 다시 촬영해 주세요.' : '사진 분석 연결이 필요해요. 시연 모드로 먼저 체험할 수 있어요.'}<button class="text-button" id="toggle-mode">${state.mode === 'demo' ? '실제 사진으로 안내받기' : '시연 모드로 연습하기'} →</button></div></section></div></section>`;
   $('#edit').onclick = () => { generation++; stopCamera(); state.busy = false; state.screen = 'setup'; state.step = 0; renderSetup(); focusHeading(); };
   $('#toggle-mode').onclick = () => enterGuide(state.mode === 'demo' ? 'real' : 'demo');
   $('#read-guide').onclick = () => { if (!('speechSynthesis' in window)) return notify('이 브라우저는 음성 안내를 지원하지 않아요.'); const old = state.sound; state.sound = true; say(guideMessage()); state.sound = old; };
@@ -101,23 +101,79 @@ function positionTarget() {
   const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
   const [y1, x1, y2, x2] = item.box;
   Object.assign(target.style, { left: `${(area.clientWidth - w) / 2 + x1 / 1000 * w}px`, top: `${(area.clientHeight - h) / 2 + y1 / 1000 * h}px`, width: `${(x2 - x1) / 1000 * w}px`, height: `${(y2 - y1) / 1000 * h}px` });
+  target.classList.toggle('label-below', parseFloat(target.style.top) < 48);
   target.hidden = false;
 }
 new ResizeObserver(positionTarget).observe(app);
 window.addEventListener('resize', positionTarget);
 
-async function openCamera() {
-  if (!navigator.mediaDevices?.getUserMedia) { $('#capture').click(); return; }
+async function openCamera(deviceId = selectedCameraId) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    notify('이 브라우저에서는 실시간 카메라를 사용할 수 없어요. localhost 또는 HTTPS로 접속하거나 사진 선택을 이용해 주세요.');
+    return;
+  }
   const token = ++generation;
+  let camera;
   try {
     stopCamera();
-    const camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    const videoOptions = deviceId ? { deviceId: { exact: deviceId } }
+      : matchMedia('(pointer: coarse)').matches ? { facingMode: { ideal: 'environment' } } : true;
+    // Desktop cameras use their default resolution; do not force a mobile rear-camera preference.
+    camera = await navigator.mediaDevices.getUserMedia({ video: videoOptions, audio: false });
     if (token !== generation || state.screen !== 'guide') { camera.getTracks().forEach(t => t.stop()); return; }
     stream = camera; resetResult(); state.image = ''; renderGuide();
     $('#viewfinder').innerHTML = '<video id="video" autoplay playsinline muted aria-label="키오스크 실시간 카메라"></video><div class="camera-reticle" aria-hidden="true"></div>';
-    $('#video').srcObject = stream;
-    await $('#video').play(); notify('화면 전체가 보이면 아래 ‘화면 촬영’을 눌러 주세요.');
-  } catch { stopCamera(); notify('카메라를 열지 못했어요. 촬영 또는 사진 선택을 이용해 주세요.'); $('#capture').click(); }
+    const video = $('#video'); video.srcObject = camera;
+    await video.play();
+    if (token !== generation || stream !== camera) return;
+    const track = camera.getVideoTracks()[0];
+    selectedCameraId = track?.getSettings().deviceId || deviceId;
+    await showCameraChoices(camera, token);
+    if (token !== generation || stream !== camera) return;
+    if (track) track.onended = () => {
+      if (stream !== camera || state.screen !== 'guide') return;
+      stopCamera(); state.error = '카메라 연결이 끊겼어요. 카메라를 다시 켜거나 사진을 선택해 주세요.'; renderGuide();
+    };
+    notify('영상이 나오지 않으면 아래 ‘사용할 카메라’에서 실제 웹캠을 선택해 주세요.');
+  } catch (error) {
+    camera?.getTracks().forEach(track => track.stop());
+    if (token !== generation) return;
+    stopCamera();
+    const messages = {
+      NotAllowedError: '브라우저 또는 Windows에서 카메라 접근을 허용해 주세요.',
+      NotFoundError: '선택한 카메라를 찾지 못했어요. 다시 켜거나 사진을 선택해 주세요.',
+      NotReadableError: '카메라 영상을 읽지 못했어요. 다른 카메라 앱을 종료하거나 브라우저의 카메라 설정에서 실제 웹캠을 선택해 주세요.',
+      OverconstrainedError: '선택한 카메라를 사용할 수 없어요. 다시 켜거나 다른 카메라를 선택해 주세요.'
+    };
+    selectedCameraId = '';
+    state.error = messages[error.name] || '카메라 영상을 재생하지 못했어요. 다른 브라우저 또는 사진 선택을 이용해 주세요.';
+    renderGuide(); notify(state.error);
+  }
+}
+async function showCameraChoices(camera, token) {
+  // Camera labels become available after permission. Device labels are rendered as text only.
+  let devices = [];
+  try { devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput' && device.deviceId); }
+  catch { /* Keep the working stream even when listing additional cameras is unavailable. */ }
+  if (token !== generation || stream !== camera || !$('#viewfinder')) return;
+  const controls = document.createElement('div'); controls.className = 'camera-settings';
+  const label = document.createElement('label'); label.htmlFor = 'camera-device'; label.textContent = '사용할 카메라';
+  const select = document.createElement('select'); select.id = 'camera-device';
+  const track = camera.getVideoTracks()[0];
+  if (!devices.some(device => device.deviceId === selectedCameraId)) {
+    const current = document.createElement('option'); current.value = selectedCameraId;
+    current.textContent = track?.label || '현재 카메라'; select.append(current);
+  }
+  devices.forEach((device, i) => {
+    const option = document.createElement('option'); option.value = device.deviceId;
+    option.textContent = device.label || `카메라 ${i + 1}`; select.append(option);
+  });
+  select.value = selectedCameraId;
+  select.onchange = () => openCamera(select.value);
+  const hint = document.createElement('p');
+  hint.textContent = '검은 화면이나 빨간 X가 보이면 목록에서 다른 카메라를 선택해 주세요. 가상 카메라 대신 실제 웹캠을 선택해 주세요.';
+  controls.append(label, select, hint);
+  app.querySelector('.camera-tools').after(controls);
 }
 function captureFrame() {
   const video = $('#video'); if (!video?.videoWidth) return notify('카메라가 준비될 때까지 잠시 기다려 주세요.');
