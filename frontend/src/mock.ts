@@ -22,7 +22,8 @@ export type Box = [number, number, number, number]
 // 안내 종류
 // guide: 버튼 안내(박스) / retake: 흐리거나 못 알아봄 → 다시 찍기
 // wrong: 엉뚱한 화면 → 벗어나는 버튼 안내(박스) / ask: 사용자에게 확인 질문(choices 칩으로 답)
-export type StepKind = 'guide' | 'retake' | 'wrong' | 'ask'
+// action: 카드 대기·바코드 보여주기·영수증 받기 등 기기에서 하는 행동 (박스 없음, 백엔드 PR #5)
+export type StepKind = 'guide' | 'action' | 'retake' | 'wrong' | 'ask'
 export type GuideStep = {
   kind: StepKind
   message: string

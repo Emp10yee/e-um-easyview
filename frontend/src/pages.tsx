@@ -58,11 +58,9 @@ export function IntroPage() {
       <p className="text-3xl font-extrabold text-green-800 leading-none mt-2">EasyView</p>
       {/* 여백 → 문구 */}
       <p className="mt-10 text-2xl font-bold leading-snug break-keep">
-        함께하는 쉬운 주문
+        화면 찍고, 따라 보고, 주문하고!
         <br />
-        키오스크 화면을 찍으면
-        <br />
-        누를 곳을 하나씩 알려드려요
+        어려운 주문도 쉽게 할 수 있어요
       </p>
       {/* 큰 여백 → 버튼 */}
       <div className="w-full flex flex-col items-center gap-3 mt-20">
@@ -464,7 +462,9 @@ export function GuidePage() {
       ? '다시 찍기'
       : kind === 'wrong'
         ? '눌렀어요, 다시 찍기'
-        : isAsk
+        : kind === 'action' // 카드 대기·바코드 등 기기에서 하는 행동 (박스 없음, 정상 안내)
+          ? '했어요, 다음 화면 찍기'
+          : isAsk
           ? '위에서 골라주세요'
           : '눌렀어요, 다음 화면 찍기'
 
