@@ -1,0 +1,13 @@
+{
+  "name": "e-um-easyview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "test": "node --test",
+    "check": "node --check server.mjs && node --check public/app.js && node --check lib/guide.mjs"
+  },
+  "engines": { "node": ">=22.9" }
+}
