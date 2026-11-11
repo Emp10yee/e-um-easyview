@@ -2,3 +2,11 @@
 CLAUDE.md
 UI.md
 .env.local
+
+.env
+.env.*
+!.env.example
+node_modules/
+.idea/
+tmp/
+*.log

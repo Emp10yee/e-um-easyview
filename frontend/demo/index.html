@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#176b54">
+  <meta name="description" content="키오스크 앞에서, 한 번에 한 걸음. 이음이 주문을 도와드려요.">
+  <title>이음 EasyView · 쉬운 키오스크 안내</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <header class="header"><a class="brand" href="/" aria-label="이음 처음으로"><span class="brand-mark">e</span> 이음 <span class="brand-sub">EasyView</span></a><button id="sound" class="quiet" aria-pressed="false">♬ 음성 안내 끔</button></header>
+  <main id="app"></main>
+  <div id="notice" role="status" aria-live="polite"></div>
+  <input id="photo" type="file" accept="image/jpeg,image/png,image/webp" hidden>
+  <input id="capture" type="file" accept="image/*" capture="environment" hidden>
+  <footer class="site-footer">복잡한 화면도, 한 번에 한 걸음. <span>이음이 함께할게요.</span></footer>
+</body>
+</html>

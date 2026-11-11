@@ -1,0 +1,16 @@
+{
+  "name": "e-um-easyview",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "test": "npm --prefix backend test",
+    "check": "npm --prefix backend run check && node --check frontend/demo/app.js && node --check frontend/demo/demo.js"
+  },
+  "engines": { "node": ">=22.9" }
+}
