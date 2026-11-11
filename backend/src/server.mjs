@@ -4,7 +4,8 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { validateAnalysis, makePrompt, stages } from './lib/guide.mjs';
 
-const root = fileURLToPath(new URL('./public/', import.meta.url));
+// 기존 시연 UI는 프런트엔드 영역에 보관하고 개발 편의를 위해 함께 제공합니다.
+const root = fileURLToPath(new URL('../../frontend/demo/', import.meta.url));
 const types = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.svg': 'image/svg+xml' };
 function json(res, status, body) { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); }
 async function body(req) {
