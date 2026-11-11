@@ -4,10 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --env-file-if-exists=.env server.mjs",
-    "start": "node --env-file-if-exists=.env server.mjs",
-    "test": "node --test",
-    "check": "node --check server.mjs && node --check public/app.js && node --check lib/guide.mjs"
+    "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build:frontend": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "test": "npm --prefix backend test",
+    "check": "npm --prefix backend run check && node --check frontend/demo/app.js && node --check frontend/demo/demo.js"
   },
   "engines": { "node": ">=22.9" }
 }

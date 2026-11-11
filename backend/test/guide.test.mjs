@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { validateAnalysis, makePrompt } from '../lib/guide.mjs';
-import { demoScreen } from '../public/demo.js';
+import { validateAnalysis, makePrompt } from '../src/lib/guide.mjs';
+import { demoScreen } from '../../frontend/demo/demo.js';
 
 test('rejects invalid, reversed, nonnumeric, or missing coordinates', () => {
   for (const box of [[0, 0, 1200, 50], [100, 50, 20, 80], [0, 0, '50', 50], [0, 0, 50]]) {

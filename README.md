@@ -1,23 +1,84 @@
 # 이음 EasyView
 
-디지털 약자를 위한 **모바일 웹앱**. 브라우저에서 키오스크를 촬영하면 누를 곳을 안내합니다. HTML/CSS/JavaScript 프런트엔드와 Node.js 서버로 구성했습니다.
+디지털 취약계층을 위한 키오스크 안내 웹앱입니다. `develop` 브랜치에서 백엔드와 프런트엔드의 담당 영역을 분리했습니다.
+
+## 폴더 구조
+
+```text
+e-um-easyview/
+├── backend/                  # 백엔드 담당 영역 (Node.js)
+│   ├── src/
+│   │   ├── server.mjs         # HTTP API, 입력 검증, Gemini 호출
+│   │   └── lib/
+│   │       └── guide.mjs      # 안내 프롬프트, 분석 응답 검증
+│   ├── test/
+│   │   └── guide.test.mjs
+│   ├── .env.example
+│   ├── package.json
+│   └── README.md
+├── frontend/                 # 프런트엔드 담당 영역 (React + TypeScript + Vite)
+│   ├── src/                  # front 브랜치의 팀원 소스
+│   │   ├── App.tsx
+│   │   ├── pages.tsx
+│   │   ├── mock.ts
+│   │   ├── main.tsx
+│   │   └── index.css
+│   ├── public/
+│   ├── demo/                 # 기존 HTML/JS 시연 화면 보존
+│   │   ├── index.html
+│   │   ├── app.js
+│   │   ├── demo.js
+│   │   └── styles.css
+│   ├── index.html
+│   ├── vite.config.ts
+│   ├── tsconfig*.json
+│   ├── package.json
+│   ├── package-lock.json
+│   └── README.md
+├── .gitignore
+├── package.json              # 각 폴더 실행을 위한 편의 명령
+└── README.md
+```
+
+프런트엔드 소스는 공유된 저장소의 `front` 브랜치 커밋 `8cc68d7bc68cafd0e8a76c8d8ddbf8a562e7e7c1`과 일치하는 로컬 `origin/front`에서 복사했습니다. 화면 코드와 Vite 설정은 변경하지 않았습니다. 기존 시연 UI는 삭제하지 않고 `frontend/demo/`로 이동했습니다.
 
 ## IntelliJ에서 실행
 
-1. IntelliJ IDEA에서 이 저장소 폴더를 **Open** 합니다.
-2. Node.js **22.9 이상**을 설치하고 내장 터미널에서 실행합니다. 외부 npm 패키지가 없어 `npm install`은 필요하지 않습니다.
+저장소 루트 폴더를 Open한 뒤 내장 Terminal에서 실행합니다. Node.js 22.9 이상이 필요합니다. 프런트엔드의 Vite가 요구하는 버전도 충족하도록 Node.js 24 사용을 권장합니다.
+
+### 백엔드 + 기존 시연 화면
 
 ```powershell
 npm run dev
 ```
 
-3. 브라우저에서 **http://localhost:3000** 으로 접속합니다.
+또는 `npm run dev:backend`로 실행합니다. 별도 npm 패키지 설치가 필요 없습니다. 기본 주소는 `http://localhost:3000`입니다. 루트에서 실행하면 백엔드 폴더로 이동해 실행하므로 환경변수는 `backend/.env`에서 읽습니다.
 
-IntelliJ의 Node.js 플러그인이 있으면 `package.json`의 `dev` 옆 실행 버튼도 사용할 수 있습니다. 플러그인이 없는 경우에도 내장 터미널에서 실행하고 소스를 편집할 수 있습니다.
+포트가 이미 사용 중이면 같은 터미널에서 다음과 같이 실행합니다.
+
+```powershell
+$env:PORT = "3001"
+npm run dev
+```
+
+그 뒤 `http://localhost:3001`로 접속합니다.
+
+### 팀원 React 프런트엔드
+
+다른 터미널에서 실행합니다.
+
+```powershell
+npm --prefix frontend ci
+npm run dev:frontend
+```
+
+접속 주소는 Vite가 출력하는 URL을 사용합니다. 현재 팀원 설정은 HTTPS이며 기본 포트는 5173입니다. 이 프런트엔드는 아직 목 데이터로 동작합니다. 실제 백엔드 연결은 이번 구조 분리에 포함하지 않았습니다.
+
+빌드는 `npm run build:frontend`입니다. React 프런트엔드의 의존성 설치와 빌드 검증은 별도로 진행해야 합니다.
 
 ## 실제 사진 분석 설정
 
-`.env.example`을 `.env`로 복사해 API 키를 입력하고 서버를 다시 시작합니다. `.env`는 Git에서 제외됩니다. API 키를 프런트엔드 코드에 넣지 마세요.
+`backend/.env.example`을 `backend/.env`로 복사해 설정하고 백엔드를 다시 실행합니다.
 
 ```dotenv
 GEMINI_API_KEY=발급받은_API_키
@@ -26,41 +87,25 @@ PORT=3000
 HOST=127.0.0.1
 ```
 
-모델은 계정에서 이용 가능한 이미지 입력 지원 Gemini 모델로 바꿀 수 있습니다. [공식 이미지 입력 문서](https://ai.google.dev/gemini-api/docs/image-understanding)를 참고하세요. API 사용료는 해당 계정에 적용됩니다.
+API 키를 프런트엔드 소스나 GitHub에 올리지 마세요. `.env`는 하위 폴더에서도 Git에서 제외됩니다. 키가 없으면 기존 시연 화면에서 가상 키오스크 체험이 가능합니다. 실제 사진은 서버를 거쳐 Google Gemini로 전송되며 이 서버는 사진을 디스크에 저장하지 않습니다.
 
-- 사진은 최대 변 1600px JPEG로 축소 후 서버를 거쳐 Google Gemini로 전송됩니다. 이 서버는 사진과 주문 설정을 디스크에 저장하지 않습니다.
-- 전체 이미지 기준 `[ymin, xmin, ymax, xmax]` 0–1000 좌표로 결과를 받고, 이미지의 여백을 계산해 강조 박스를 표시합니다.
-- 실제 화면에서 단계를 판단합니다. 화면에 없거나 불확실한 버튼은 강조하지 않고 재촬영을 안내하도록 요청합니다. AI 판단은 틀릴 수 있습니다.
-- 결제와 주문은 **실제 키오스크에서 직접** 진행합니다. 이 웹앱은 안내만 제공합니다.
+## 현재 연동 상태
 
-## 시연 방법
+- 백엔드: `GET /api/status`, `POST /api/analyze` 제공
+- 기존 시연 화면 (`frontend/demo/`): 위 API와 연결되어 있으며 백엔드가 `/`에서 함께 제공
+- 팀원 React 화면 (`frontend/src/`): `mock.ts`의 목 데이터 사용. 요청·응답 필드와 API 경로를 맞추는 후속 작업 필요
 
-**API 키 없이:** 첫 화면의 `시연 체험하기` → 카페 또는 학식 예시 → `눌렀어요 · 다음 화면`으로 포장/매장 → 메뉴 → 결제 → 완료를 체험합니다. 후보 칩을 누르면 초록색 박스가 이동합니다. 예시는 코드로 만든 가상 화면으로 실제 스타벅스·학식 사진의 인식 결과가 아닙니다.
-
-**실제 사진:** 사전 설정 4단계 → 사진 선택 또는 촬영 → 화면 분석 → 실제 키오스크 조작 → 바뀐 화면 재촬영. 학식은 `기타`에서 `오늘의 식사` 또는 `직접 입력`을 선택합니다. 실시간 영상 자동 분석 대신 촬영할 때마다 분석합니다.
-
-예정된 스타벅스·학식 사진 두 장은 아직 제공되지 않았습니다. API 키와 사진을 준비한 뒤 각각의 메뉴명·좌표·추천 정확도를 별도로 검증해야 합니다.
-
-## 휴대폰 접속 및 배포
-
-PC의 `localhost`는 PC에서만 열립니다. 같은 네트워크에서 휴대폰으로 테스트하려면 `.env`에서 `HOST=0.0.0.0`으로 바꾸고 방화벽을 허용해야 합니다. 실시간 카메라는 **HTTPS 또는 localhost**에서 동작합니다. 휴대폰의 HTTP LAN 주소에서는 사진 파일 입력을 사용하거나 HTTPS 개발 터널을 준비하세요.
-
-이 구조는 Node.js 서버와 환경변수를 지원하는 호스팅이 필요합니다. GitHub Pages 같은 정적 호스팅에는 그대로 배포할 수 없습니다. 현재는 로컬 시연용이며, 공개 서비스 전에는 사용자 인증·사용자별 요청 제한 등 API 비용 보호가 필요합니다.
+현재 API 명세와 요청 예시는 `backend/README.md`를 확인하세요. 이번 변경에서는 Spring Boot 전환, 실제 프런트엔드 API 연동, 추가 기능 구현을 하지 않았습니다.
 
 ## 검증
 
 ```powershell
-npm run check
 npm test
+npm run check
 ```
 
-테스트는 좌표 검증, 잘못된 AI 응답 거부, 시연 단계, 기본 메뉴 우선 추천, 미노출 메뉴 처리를 확인합니다. 실제 Gemini 연결은 키와 실제 사진이 있어야 검증할 수 있습니다.
+백엔드와 기존 시연 화면의 테스트·문법 검사를 실행합니다. 이 명령은 React TypeScript 빌드를 포함하지 않습니다. 실제 Gemini 분석은 API 키와 스타벅스·학식 키오스크 사진으로 별도 검증해야 합니다.
 
-## 파일 구성
+## 모바일 및 배포
 
-- `public/`: 반응형 화면, 카메라, 사진 업로드, 음성 안내, 시연
-- `server.mjs`: 정적 파일 및 Gemini 프록시
-- `lib/guide.mjs`: AI 안내 문맥, 결과 좌표 검증
-- `test/guide.test.mjs`: 핵심 동작 테스트
-
-이틀 시연 범위에 맞춰 별도 DB, 로그인, 주문 연동 없이 구성했습니다. 외부 폰트 로딩에 실패하면 시스템 글꼴을 사용합니다.
+실시간 카메라는 HTTPS 또는 localhost 환경이 필요합니다. PC의 localhost는 휴대폰에서 접속할 수 없습니다. 백엔드는 Node.js 서버와 환경변수를 지원하는 호스팅이 필요하며, 정적 GitHub Pages에 그대로 배포할 수 없습니다. 공개 운영 전에는 인증과 사용자별 요청 제한 등 비용 보호가 필요합니다. 현재는 로컬 시연 단계입니다.
