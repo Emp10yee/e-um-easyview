@@ -29,9 +29,15 @@ export type GuideStep = {
   box: Box | null
   alternatives: string[] // guide일 때 대안 메뉴 칩
   choices?: string[] // ask일 때 답변 칩 (최대 2개)
+  // ↓ 실제 API 연동용 (화면은 몰라도 됨)
+  mock?: boolean // 목 데이터로 만든 안내인지
+  stage?: string // 이번 사진의 단계 (다음 요청의 previousStage)
+  targets?: { label: string; box: Box }[] // 대안 메뉴 좌표 (칩 누르면 바로 박스 이동)
+  selectedMenu?: string // 사용자가 고른 메뉴 (다음 요청에 계속 전달)
+  clarification?: { question: string; answer: string } // 확인 질문 답 (계속 전달)
 }
 
-const g = (message: string, box: Box, alternatives: string[] = []): GuideStep => ({ kind: 'guide', message, box, alternatives })
+const g = (message: string, box: Box, alternatives: string[] = []): GuideStep => ({ kind: 'guide', message, box, alternatives, mock: true })
 
 // 목 시나리오 (카페). 고른 내용(ctx)으로 알 수 있는 건 묻지 않고 바로 안내
 // 시연용으로 '다시 찍기'와 '엉뚱한 화면'을 한 번씩 넣어 둠 (필요 없으면 해당 줄 삭제)
@@ -41,33 +47,51 @@ function mockScript(ctx: Ctx): GuideStep[] {
     ? g("'아이스'를 눌러주세요", [300, 80, 460, 480])
     : cat.includes('따뜻한')
       ? g("'핫'을 눌러주세요", [300, 520, 460, 920])
-      : { kind: 'ask', message: '차갑게 드실까요, 따뜻하게 드실까요?', box: null, alternatives: [], choices: ['차갑게', '따뜻하게'] }
+      : { kind: 'ask', message: '차갑게, 따뜻하게 중 하나를 골라주세요', box: null, alternatives: [], choices: ['차갑게', '따뜻하게'], mock: true }
   return [
-    { kind: 'retake', message: '화면이 흐려요. 키오스크에 조금 더 가까이 비춰주세요', box: null, alternatives: [] },
+    { kind: 'retake', message: '화면이 흐려요. 키오스크에 조금 더 가까이 비춰주세요', box: null, alternatives: [], mock: true },
     g("위쪽 '커피'를 눌러주세요", [120, 80, 260, 420], ['차', '디저트']),
     g("'아메리카노'를 눌러주세요", [300, 520, 480, 900], ['라떼', '아이스티']),
-    { kind: 'wrong', message: "다른 화면으로 넘어갔어요. 왼쪽 위 '뒤로'를 눌러주세요", box: [30, 20, 120, 260], alternatives: [] },
+    { kind: 'wrong', message: "다른 화면으로 넘어갔어요. 왼쪽 위 '뒤로'를 눌러주세요", box: [30, 20, 120, 260], alternatives: [], mock: true },
     temp,
     // 포장일 때만 일회용품 질문 (매장은 일회용품 안 씀)
     ...(ctx.dineType.startsWith('포장')
-      ? [{ kind: 'ask', message: '빨대·뚜껑 같은 일회용품이 필요하세요?', box: null, alternatives: [], choices: ['필요해요', '필요 없어요'] } as GuideStep]
+      ? [{ kind: 'ask', message: '빨대·뚜껑 같은 일회용품이 필요한지 골라주세요', box: null, alternatives: [], choices: ['필요해요', '필요 없어요'], mock: true } as GuideStep]
       : []),
     g("아래 '결제하기'를 눌러주세요", [820, 300, 960, 700]),
   ]
 }
 
-// 프레임 캡처: 가로 640px로 줄여 JPEG base64(헤더 제거)로 반환
-// 카메라가 없으면 빈 문자열 (목 흐름은 그대로 진행)
-export const captureFrame = (video: HTMLVideoElement | null) => {
-  if (!video || !video.videoWidth) return ''
-  const w = 640,
-    h = Math.round((video.videoHeight / video.videoWidth) * w)
+// 이미지/영상을 가로 최대 960px JPEG dataURL로 줄임 (화면 표시 + 분석 전송 겸용)
+const shrink = (src: CanvasImageSource, sw: number, sh: number) => {
+  const w = Math.min(960, sw),
+    h = Math.round((sh / sw) * w)
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
-  c.getContext('2d')!.drawImage(video, 0, 0, w, h)
-  return c.toDataURL('image/jpeg', 0.6).split(',')[1]
+  c.getContext('2d')!.drawImage(src, 0, 0, w, h)
+  return c.toDataURL('image/jpeg', 0.7)
 }
+
+// 카메라 사진 찍기: 카메라가 없으면 빈 문자열 (목 흐름은 그대로 진행)
+export const captureFrame = (video: HTMLVideoElement | null) =>
+  !video || !video.videoWidth ? '' : shrink(video, video.videoWidth, video.videoHeight)
+
+// 갤러리 사진 불러오기: 실패하면 빈 문자열
+export const loadPhoto = (file: File) =>
+  new Promise<string>((resolve) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => {
+      resolve(shrink(img, img.naturalWidth, img.naturalHeight))
+      URL.revokeObjectURL(url)
+    }
+    img.onerror = () => {
+      resolve('')
+      URL.revokeObjectURL(url)
+    }
+    img.src = url
+  })
 
 // 대안 칩을 눌렀을 때 보여줄 안내 (목)
 export const MOCK_ALTS: Record<string, { message: string; box: Box }> = {
@@ -87,30 +111,88 @@ export const MOCK_ANSWERS: Record<string, GuideStep> = {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// 화면은 이 함수만 호출. 더 안내할 게 없으면 null(=주문 끝)
-// TODO: 실제 API 연동 → POST /tasks/{taskId}/analyses (Gemini)
-export async function analyzeFrame(imageBase64: string, ctx: Ctx, stepIndex: number): Promise<GuideStep | null> {
+// ===== 실제 API 연동 (백엔드 PR #3, POST /api/analyze) =====
+// 서버 꺼짐 / API 키 없음 → 목으로 진행 (시연 보호)
+class UseMock extends Error {}
+const retake = (message: string): GuideStep => ({ kind: 'retake', message, box: null, alternatives: [] })
+
+// 백엔드 호출. 주문 끝이면 null, AI 오류면 서버 문구로 retake, 서버 없으면 UseMock throw
+async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefined, clarification?: GuideStep['clarification']): Promise<GuideStep | null> {
+  if (!imageBase64) throw new UseMock() // 카메라 없음 → 목
+  const keep = { selectedMenu: prev?.selectedMenu, clarification: clarification ?? prev?.clarification }
+  let res: Response
   try {
-    // TODO: 실제 API 연동 (8초 타임아웃, 응답은 JSON만 받도록 프롬프트에 고정)
-    // 응답에 ```json 펜스가 섞이면 제거 후 JSON.parse, 끝났으면 null 반환
-    // 실패 시 아래 폴백으로 이동
-    void imageBase64
-  } catch {}
+    res = await fetch('/api/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        imageBase64,
+        mimeType: 'image/jpeg',
+        ctx,
+        previousStage: prev?.stage ?? 'place',
+        context: keep,
+      }),
+      signal: AbortSignal.timeout(65_000), // 서버가 Gemini를 최대 55초 기다림
+    })
+  } catch (e) {
+    if ((e as Error).name === 'TimeoutError') return retake('분석이 오래 걸려요. 다시 찍어주세요')
+    throw new UseMock() // 서버에 연결 안 됨 → 목
+  }
+  const data = (await res.json().catch(() => null)) as any
+  // code가 없으면 우리 백엔드가 아님(프록시 오류 등) → 목
+  if (!res.ok) {
+    if (!data?.code || data.code === 'AI_NOT_CONFIGURED') throw new UseMock()
+    return retake(data.error || '화면을 읽지 못했어요. 다시 찍어주세요')
+  }
+  if (data.kind === 'complete' || data.completed) return null
+  return {
+    kind: data.kind,
+    message: data.message,
+    box: data.box ?? null,
+    alternatives: data.alternatives ?? [],
+    choices: data.choices,
+    stage: data.stage,
+    targets: data.candidates ?? [],
+    ...keep,
+  }
+}
+
+// 화면은 이 함수만 호출. 더 안내할 게 없으면 null(=주문 끝)
+// prev: 직전 안내 (단계·고른 메뉴·질문 답을 이어서 보냄)
+export async function analyzeFrame(imageBase64: string, ctx: Ctx, stepIndex: number, prev?: GuideStep): Promise<GuideStep | null> {
+  try {
+    return await callApi(imageBase64, ctx, prev)
+  } catch {} // UseMock → 아래 목 폴백
   await wait(1000) // 분석 중인 느낌용 1초 지연
   const script = mockScript(ctx)
   return stepIndex < script.length ? script[stepIndex] : null // 목 데이터 폴백
 }
 
-// 확인 질문 답변 → 다음 안내
-// TODO: 실제 API 연동 → POST /tasks/{taskId}/analyses/{analysisId}/clarifications 후 재분석
-export async function answerClarification(step: GuideStep, choice: string): Promise<GuideStep> {
+// 확인 질문 답변 → 같은 사진 + 답변으로 다시 분석 (별도 API 없음)
+export async function answerClarification(step: GuideStep, choice: string, imageBase64: string, ctx: Ctx): Promise<GuideStep> {
+  if (!step.mock) {
+    try {
+      const next = await callApi(imageBase64, ctx, step, { question: step.message, answer: choice })
+      // 질문에 답했는데 끝났다고 오는 경우는 거의 없음 → 다시 찍기로 안내
+      return next ?? retake('다음 화면을 찍어주세요')
+    } catch {}
+  }
   await wait(500)
   return MOCK_ANSWERS[choice] ?? { ...step, kind: 'retake', message: '다시 한 번 비춰주세요', box: null }
 }
 
-// 대안 칩 선택 시 안내 (목)
-// TODO: 실제 API 연동 시 고른 메뉴 이름을 넣어 analyzeFrame 재호출
+// 대안 칩 선택 → API가 준 좌표로 바로 박스 이동 (AI 재호출 없음), 고른 메뉴는 다음 요청에 전달
 export function pickAlternative(step: GuideStep, name: string): GuideStep {
+  const t = step.targets?.find((x) => x.label === name)
+  if (t) {
+    return {
+      ...step,
+      message: `'${name}'을(를) 눌러주세요`,
+      box: t.box,
+      alternatives: step.targets!.map((x) => x.label).filter((l) => l !== name),
+      selectedMenu: name,
+    }
+  }
   const alt = MOCK_ALTS[name]
   if (!alt) return step
   return { ...step, ...alt, alternatives: step.alternatives.filter((a) => a !== name) }
