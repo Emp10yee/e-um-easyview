@@ -8,7 +8,7 @@
 e-um-easyview/
 ├── backend/                  # 백엔드 담당 영역 (Node.js)
 │   ├── src/
-│   │   ├── server.mjs         # HTTP API, 입력 검증, Gemini 호출
+│   │   ├── server.mjs         # HTTP API, 입력 검증, BAZE Gateway 호출
 │   │   └── lib/
 │   │       └── guide.mjs      # 안내 프롬프트, 분석 응답 검증
 │   ├── test/
@@ -81,13 +81,14 @@ npm run dev:frontend
 `backend/.env.example`을 `backend/.env`로 복사해 설정하고 백엔드를 다시 실행합니다.
 
 ```dotenv
-GEMINI_API_KEY=발급받은_API_키
-GEMINI_MODEL=gemini-2.5-flash
+BAZE_API_KEY=발급받은_API_키
+BAZE_MODEL=google/gemma-4-31B-it
+BAZE_BASE_URL=https://factchat-cloud.mindlogic.ai/v1/gateway
 PORT=3000
 HOST=127.0.0.1
 ```
 
-API 키를 프런트엔드 소스나 GitHub에 올리지 마세요. `.env`는 하위 폴더에서도 Git에서 제외됩니다. 키가 없으면 기존 시연 화면에서 가상 키오스크 체험이 가능합니다. 실제 사진은 서버를 거쳐 Google Gemini로 전송되며 이 서버는 사진을 디스크에 저장하지 않습니다.
+API 키를 프런트엔드 소스나 GitHub에 올리지 마세요. `.env`는 하위 폴더에서도 Git에서 제외됩니다. 키가 없으면 기존 시연 화면에서 가상 키오스크 체험이 가능합니다. 실제 사진은 서버를 거쳐 학교 BAZE Gateway와 선택한 모델 제공업체로 전송되며 이 서버는 사진을 디스크에 저장하지 않습니다.
 
 ## 현재 연동 상태
 
@@ -104,7 +105,7 @@ npm test
 npm run check
 ```
 
-백엔드와 기존 시연 화면의 테스트·문법 검사를 실행합니다. 이 명령은 React TypeScript 빌드를 포함하지 않습니다. 실제 Gemini 분석은 API 키와 스타벅스·학식 키오스크 사진으로 별도 검증해야 합니다.
+백엔드와 기존 시연 화면의 테스트·문법 검사를 실행합니다. 이 명령은 React TypeScript 빌드를 포함하지 않습니다. 실제 Gateway 분석은 API 키와 스타벅스·학식 키오스크 사진으로 별도 검증해야 합니다.
 
 ## 모바일 및 배포
 

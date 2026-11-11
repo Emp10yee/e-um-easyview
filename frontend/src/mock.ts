@@ -111,7 +111,7 @@ export const MOCK_ANSWERS: Record<string, GuideStep> = {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
-// ===== 실제 API 연동 (백엔드 PR #3, POST /api/analyze) =====
+// ===== 실제 API 연동 (POST /api/analyze, 백엔드가 학교 BAZE Gateway 호출) =====
 // 서버 꺼짐 / API 키 없음 → 목으로 진행 (시연 보호)
 class UseMock extends Error {}
 const retake = (message: string): GuideStep => ({ kind: 'retake', message, box: null, alternatives: [] })
@@ -132,7 +132,7 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
         previousStage: prev?.stage ?? 'place',
         context: keep,
       }),
-      signal: AbortSignal.timeout(65_000), // 서버가 Gemini를 최대 55초 기다림
+      signal: AbortSignal.timeout(65_000), // 서버가 AI를 최대 55초 기다림
     })
   } catch (e) {
     if ((e as Error).name === 'TimeoutError') return retake('분석이 오래 걸려요. 다시 찍어주세요')

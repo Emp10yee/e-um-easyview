@@ -7,7 +7,7 @@
     "dev": "node --env-file-if-exists=.env src/server.mjs",
     "start": "node --env-file-if-exists=.env src/server.mjs",
     "test": "node --test",
-    "check": "node --check src/server.mjs && node --check src/lib/guide.mjs"
+    "check": "node --check src/server.mjs && node --check src/app.mjs && node --check src/lib/guide.mjs && node --check src/lib/request.mjs && node --check src/lib/gateway.mjs"
   },
   "engines": { "node": ">=22.9" }
 }
