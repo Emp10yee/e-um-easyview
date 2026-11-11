@@ -7,7 +7,11 @@ export function gatewayEndpoint(baseUrl = DEFAULT_GATEWAY_URL) {
   return `${url.href.replace(/\/+$/, '')}/chat/completions/`;
 }
 
-const boxSchema = { type: 'array', items: { type: 'number' }, minItems: 4, maxItems: 4 };
+const boxSchema = {
+  type: 'array',
+  description: 'Exact visible touch-control bounds: [top, left, bottom, right] = [ymin, xmin, ymax, xmax]. All edges are normalized 0-1000 against the FULL uploaded photo including bezel/background, never against a cropped kiosk screen. The center must lie on the named control.',
+  items: { type: 'number', minimum: 0, maximum: 1000 }, minItems: 4, maxItems: 4
+};
 export const analysisSchema = {
   type: 'object', additionalProperties: false,
   required: ['stage', 'kind', 'store', 'message', 'candidates', 'choices'],

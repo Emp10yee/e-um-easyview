@@ -101,6 +101,7 @@ function positionTarget() {
   const w = img.naturalWidth * scale, h = img.naturalHeight * scale;
   const [y1, x1, y2, x2] = item.box;
   Object.assign(target.style, { left: `${(area.clientWidth - w) / 2 + x1 / 1000 * w}px`, top: `${(area.clientHeight - h) / 2 + y1 / 1000 * h}px`, width: `${(x2 - x1) / 1000 * w}px`, height: `${(y2 - y1) / 1000 * h}px` });
+  target.classList.toggle('label-below', parseFloat(target.style.top) < 48);
   target.hidden = false;
 }
 new ResizeObserver(positionTarget).observe(app);
