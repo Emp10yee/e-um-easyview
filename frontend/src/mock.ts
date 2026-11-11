@@ -37,6 +37,8 @@ export type GuideStep = {
   targets?: { label: string; box: Box }[] // 대안 메뉴 좌표 (칩 누르면 바로 박스 이동)
   selectedMenu?: string // 사용자가 고른 메뉴 (다음 요청에 계속 전달)
   clarification?: { question: string; answer: string } // 확인 질문 답 (계속 전달)
+  target?: string // 이번 안내에서 누르라고 한 버튼 이름 ('눌렀어요' 하면 pressed에 쌓임)
+  pressed?: string[] // 지금까지 '눌렀어요'로 확인한 버튼들 (같은 메뉴를 또 누르라고 하지 않게 계속 전달)
 }
 
 const g = (message: string, box: Box, alternatives: string[] = []): GuideStep => ({ kind: 'guide', message, box, alternatives, mock: true })
@@ -54,7 +56,7 @@ function mockScript(ctx: Ctx): GuideStep[] {
     { kind: 'retake', message: '화면이 흐려요. 키오스크에 조금 더 가까이 비춰주세요', box: null, alternatives: [], mock: true },
     g("위쪽 '커피'를 눌러주세요", [120, 80, 260, 420], ['차', '디저트']),
     g("'아메리카노'를 눌러주세요", [300, 520, 480, 900], ['라떼', '아이스티']),
-    { kind: 'wrong', message: "다른 화면으로 넘어갔어요. 왼쪽 위 '뒤로'를 눌러주세요", box: [30, 20, 120, 260], alternatives: [], mock: true },
+    { kind: 'wrong', message: "다른 화면으로 넘어갔어요. 키오스크 화면 왼쪽 위 '뒤로'를 눌러주세요", box: [30, 20, 120, 260], alternatives: [], mock: true },
     temp,
     // 포장일 때만 일회용품 질문 (매장은 일회용품 안 씀)
     ...(ctx.dineType.startsWith('포장')
@@ -76,15 +78,16 @@ function payMock(payment: string): GuideStep[] {
   return [g("'카드 결제'를 눌러주세요", [400, 80, 560, 480]), act('카드를 결제 기계에 대고 끝날 때까지 기다려주세요')]
 }
 
-// 이미지/영상을 가로 최대 960px JPEG dataURL로 줄임 (화면 표시 + 분석 전송 겸용)
+// 이미지/영상을 긴 변 최대 1600px JPEG dataURL로 줄임 (작은 글씨도 AI가 읽게) (화면 표시 + 분석 전송 겸용)
 const shrink = (src: CanvasImageSource, sw: number, sh: number) => {
-  const w = Math.min(960, sw),
-    h = Math.round((sh / sw) * w)
+  const scale = Math.min(1, 1600 / Math.max(sw, sh))
+  const w = Math.round(sw * scale),
+    h = Math.round(sh * scale)
   const c = document.createElement('canvas')
   c.width = w
   c.height = h
   c.getContext('2d')!.drawImage(src, 0, 0, w, h)
-  return c.toDataURL('image/jpeg', 0.7)
+  return c.toDataURL('image/jpeg', 0.85)
 }
 
 // 카메라 사진 찍기: 카메라가 없으면 빈 문자열 (목 흐름은 그대로 진행)
@@ -133,7 +136,11 @@ const retake = (message: string): GuideStep => ({ kind: 'retake', message, box: 
 // 백엔드 호출. 주문 끝이면 null, AI 오류면 서버 문구로 retake, 서버 없으면 UseMock throw
 async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefined, clarification?: GuideStep['clarification']): Promise<GuideStep | null> {
   if (!imageBase64) throw new UseMock() // 카메라 없음 → 목
-  const keep = { selectedMenu: prev?.selectedMenu, clarification: clarification ?? prev?.clarification }
+  // 직전 안내가 버튼 안내였으면 사용자가 '눌렀어요'로 확인한 것 → 누른 목록에 추가 (최근 10개, 백엔드 제한)
+  const pressed = [...(prev?.pressed ?? []), ...(prev?.kind === 'guide' && prev.target ? [prev.target] : [])].slice(-10)
+  const keep = { selectedMenu: prev?.selectedMenu, clarification: clarification ?? prev?.clarification, pressed }
+  // 오류로 다시 찍기여도 기억은 유지 (안 그러면 다음 사진에서 누른 내용을 잊음)
+  const retakeKeep = (message: string): GuideStep => ({ ...retake(message), ...keep })
   let res: Response
   try {
     res = await fetch('/api/analyze', {
@@ -144,19 +151,19 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
         mimeType: 'image/jpeg',
         ctx,
         previousStage: prev?.stage ?? 'place',
-        context: keep,
+        context: { ...keep, pressed: pressed.length ? pressed : undefined },
       }),
       signal: AbortSignal.timeout(65_000), // 서버가 AI를 최대 55초 기다림
     })
   } catch (e) {
-    if ((e as Error).name === 'TimeoutError') return retake('분석이 오래 걸려요. 다시 찍어주세요')
+    if ((e as Error).name === 'TimeoutError') return retakeKeep('분석이 오래 걸려요. 다시 찍어주세요')
     throw new UseMock() // 서버에 연결 안 됨 → 목
   }
   const data = (await res.json().catch(() => null)) as any
   // code가 없으면 우리 백엔드가 아님(프록시 오류 등) → 목
   if (!res.ok) {
     if (!data?.code || data.code === 'AI_NOT_CONFIGURED') throw new UseMock()
-    return retake(data.error || '화면을 읽지 못했어요. 다시 찍어주세요')
+    return retakeKeep(data.error || '화면을 읽지 못했어요. 다시 찍어주세요')
   }
   if (data.kind === 'complete' || data.completed) return null
   return {
@@ -167,6 +174,7 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
     choices: data.choices,
     stage: data.stage,
     targets: data.candidates ?? [],
+    target: data.candidates?.[0]?.label,
     ...keep,
   }
 }
@@ -205,6 +213,7 @@ export function pickAlternative(step: GuideStep, name: string): GuideStep {
       box: t.box,
       alternatives: step.targets!.map((x) => x.label).filter((l) => l !== name),
       selectedMenu: name,
+      target: name, // 대안을 골랐으면 그 메뉴를 누른 것으로 기록
     }
   }
   const alt = MOCK_ALTS[name]

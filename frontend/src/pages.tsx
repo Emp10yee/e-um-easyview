@@ -37,46 +37,51 @@ export const useAppCtx = () => useContext(AppContext)
 // ===== 공통 버튼 스타일 (진한 녹색 + 흰 글씨, 아이콘 없이 글자만, 파랑/파스텔 안 씀) =====
 const BTN = 'touch-manipulation active:scale-95 rounded-2xl font-extrabold'
 const PRIMARY = `${BTN} min-h-[72px] w-full text-2xl bg-green-800 text-white active:bg-green-900 disabled:bg-gray-300 disabled:text-gray-700`
-const SECONDARY = `${BTN} min-h-[60px] text-xl bg-white text-gray-950 border-[3px] border-green-800 active:bg-gray-100 disabled:opacity-40`
+// 보조 버튼은 한 단계 얇게(bold) → 질문·안내·메인 버튼이 먼저 보이게
+const SECONDARY = `${BTN.replace('font-extrabold', 'font-bold')} min-h-[60px] text-xl bg-white text-gray-950 border-[3px] border-green-800 active:bg-gray-100 disabled:opacity-40`
 // 맨 위 작은 버튼 (뒤로, 소리) — 사용자 요청으로 60px 규칙 예외
-const SMALL = `${BTN} shrink-0 min-h-[48px] px-3 text-xl border-2 border-green-800 disabled:opacity-40`
+const SMALL = `${BTN.replace('font-extrabold', 'font-bold')} shrink-0 min-h-[48px] px-3 text-xl border-2 border-green-800 disabled:opacity-40`
 
 const CUSTOM = '직접 입력'
 
-// ===== 소개 화면 `/` (로고 + 이지뷰 / EasyView + 소개 + 시작하기 + 팀명) =====
+// 음성 안내: 지원될 때만 조용히 실행
+const speak = (text: string) => {
+  if (!('speechSynthesis' in window)) return
+  speechSynthesis.cancel()
+  const u = new SpeechSynthesisUtterance(text)
+  u.lang = 'ko-KR'
+  u.rate = 0.9 // 조금 천천히
+  speechSynthesis.speak(u)
+}
+
+// ===== 소개 화면 `/` (로고 + 이지뷰 / EasyView + 소개 + 시작 버튼을 한 묶음으로, 화면 중앙보다 살짝 위) =====
 export function IntroPage() {
   const navigate = useNavigate()
   const [logoOk, setLogoOk] = useState(true) // 로고 파일이 없으면 글자로 대신
   return (
-    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col items-center text-center px-6 pt-8 pb-6">
-      {/* 가운데 영역: 중요한 건 화면 중앙에 */}
-      <div className="flex-1 w-full flex flex-col items-center justify-center">
-        {/* 서비스명: 로고(이지뷰 폭의 약 45%) → 이지뷰(크게) → EasyView(이지뷰 폭의 약 70%) */}
-        {logoOk && (
-          <img src="/logo.png" alt="이지뷰 로고" onError={() => setLogoOk(false)} className="w-32 object-contain mb-6" />
-        )}
-        <h1 className="text-7xl font-extrabold text-green-800 leading-none">이지뷰</h1>
-        <p className="text-3xl font-extrabold text-yellow-400 leading-none mt-2">EasyView</p>
-        {/* 여백 → 문구 */}
-        <p className="mt-10 text-2xl font-bold leading-snug break-keep">
-          화면 찍고, 따라 보고, 주문하고!
-          <br />
-          어려운 주문도 쉽게 할 수 있어요
-        </p>
-        {/* 큰 여백 → 버튼 */}
-        <button onClick={() => navigate('/setup')} className={`${PRIMARY} mt-20`}>
-          주문 시작하기
-        </button>
-      </div>
-      {/* 맨 아래: 팀명 */}
-      <p className="text-xl font-bold text-gray-700">E:UM</p>
+    // 아래 여백(pb-20)을 위보다 크게 둬서 묶음 전체가 중앙보다 조금 위에 오게 함
+    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col items-center justify-center text-center px-6 pt-8 pb-20">
+      {logoOk && (
+        <img src="/logo.png" alt="이지뷰 로고" onError={() => setLogoOk(false)} className="w-32 object-contain mb-6" />
+      )}
+      <h1 className="text-7xl font-extrabold text-green-800 leading-none">이지뷰</h1>
+      <p className="text-3xl font-extrabold text-yellow-400 leading-none mt-2">EasyView</p>
+      <p className="mt-10 text-2xl font-bold leading-snug break-keep">
+        화면 찍고, 따라 보고, 주문하고!
+        <br />
+        어려운 주문도 쉽게 할 수 있어요
+      </p>
+      {/* 소개 문구 바로 아래 시작 버튼 (팀명은 뺌) */}
+      <button onClick={() => navigate('/setup')} className={`${PRIMARY} mt-14`}>
+        주문 시작하기
+      </button>
     </div>
   )
 }
 
 // ===== 설정 화면 `/setup` (사전 설정 4단계) =====
 export function StartPage() {
-  const { ctx, setCtx } = useAppCtx()
+  const { ctx, setCtx, sound, setSound } = useAppCtx()
   const navigate = useNavigate()
   // 가이드에서 '뒤로'로 왔으면 고른 내용을 유지한 채 마지막(계산 방법) 단계부터
   const fromGuide = !!(useLocation().state as any)?.toLast && !!ctx.payment
@@ -95,6 +100,14 @@ export function StartPage() {
     { q: '계산 방법을 골라주세요', options: PAYMENT_OPTIONS, key: 'payment' },
   ]
   const cur = steps[step]
+
+  // 단계가 바뀔 때마다 질문을 읽어줌 (소개 화면에서 '주문 시작하기'를 누른 뒤라 소리가 남)
+  const question = typing ? '드시고 싶은 메뉴를 적어주세요' : cur.q
+  useEffect(() => {
+    if (sound) speak(question)
+  }, [question, sound])
+  // 화면을 떠나면 읽던 것 멈춤
+  useEffect(() => () => void ('speechSynthesis' in window && speechSynthesis.cancel()), [])
 
   // 다음 단계로 (마지막이면 가이드 화면으로)
   const advance = (next: Ctx) => {
@@ -134,15 +147,27 @@ export function StartPage() {
   }
 
   return (
-    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col px-4 pt-4 pb-6">
-      {/* 상단: 뒤로 + 진행 표시 */}
-      <div className="flex items-center justify-between min-h-[60px]">
+    // 배경은 아주 연한 회색 → 흰 버튼이 카드처럼 떠 보이게
+    <div className="h-dvh w-full max-w-md mx-auto bg-stone-50 text-gray-950 flex flex-col px-4 pt-4 pb-6">
+      {/* 상단: 이전 + 진행 표시 + 소리 켬/끔 (가이드 화면과 같은 배치) */}
+      <div className="flex items-center justify-between gap-3 min-h-[60px]">
         <button onClick={goBack} className={`${SMALL} bg-white text-gray-950`}>
-          뒤로
+          이전
         </button>
-        <span className="text-2xl font-extrabold">
+        <span className="text-2xl font-bold">
           {step + 1} / {steps.length}
         </span>
+        <button
+          onClick={() => {
+            // 끌 때는 읽던 것 바로 멈춤, 켜면 지금 질문을 다시 읽어줌
+            if (sound && 'speechSynthesis' in window) speechSynthesis.cancel()
+            setSound(!sound)
+          }}
+          aria-pressed={sound}
+          className={`${SMALL} ${sound ? 'bg-green-800 text-white' : 'bg-white text-gray-950'}`}
+        >
+          {sound ? '소리 켬' : '소리 끔'}
+        </button>
       </div>
 
       {/* 진행 막대 (녹색 = 지난 단계) */}
@@ -163,12 +188,12 @@ export function StartPage() {
 
       {/* 질문 */}
       <h1 className="text-3xl font-extrabold leading-snug mt-3 mb-4 break-keep">
-        {typing ? '드시고 싶은 메뉴를 적어주세요' : cur.q}
+        {question}
       </h1>
 
       {typing ? (
         // 직접 입력: 모달 없이 같은 화면에서 큰 입력칸 + 확인 버튼
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-5">
           <input
             autoFocus
             value={text}
@@ -177,7 +202,7 @@ export function StartPage() {
             placeholder="예: 김치볶음밥"
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && submitText()}
-            className="min-h-[72px] w-full px-4 rounded-2xl border-[3px] border-gray-950 text-2xl font-bold placeholder:text-gray-500 outline-none focus:ring-4 focus:ring-green-700"
+            className="min-h-[72px] w-full px-4 bg-white rounded-2xl border-[3px] border-gray-950 text-2xl font-bold placeholder:text-gray-500 outline-none focus:ring-4 focus:ring-green-700"
           />
           <button onClick={submitText} disabled={!text.trim()} className={PRIMARY}>
             이 메뉴로 할게요
@@ -188,7 +213,7 @@ export function StartPage() {
         </div>
       ) : (
         // 선택 버튼: 남은 세로 공간을 꽉 채움 (시니어는 스크롤을 잘 안 해서 6개까지 한 화면에 들어가게)
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
+        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5">
           {cur.options.map((opt) => (
             <button
               key={opt}
@@ -219,6 +244,9 @@ const boxStyle = ([ymin, xmin, ymax, xmax]: Box) => ({
   width: `${(xmax - xmin) / 10}%`,
 })
 
+// 한 번 찾은 메인 후면 카메라 (다시 켤 때 바로 이 렌즈로)
+let mainCamId = ''
+
 // 카메라 미리보기 / 찍은 사진 + Bounding Box
 // photo가 있으면 사진 위에 박스, 없으면 실시간 카메라 (영상은 계속 켜둬서 다시 찍기가 빠름)
 function CameraView({
@@ -244,14 +272,38 @@ function CameraView({
     let stream: MediaStream | null = null
     let cancelled = false
     setError(false)
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
-      .then((s) => {
-        if (cancelled) return s.getTracks().forEach((t) => t.stop())
-        stream = s
-        if (videoRef.current) videoRef.current.srcObject = s
-      })
-      .catch(() => !cancelled && setError(true))
+    const md = navigator.mediaDevices
+    // 해상도를 안 정하면 640x480으로 열려서 흐림 → 고해상도 요청 (안 되면 폰이 가능한 최대로)
+    const open = (cam: MediaTrackConstraints) =>
+      md.getUserMedia({ video: { ...cam, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false })
+    ;(async () => {
+      let s = await open(mainCamId ? { deviceId: { exact: mainCamId } } : { facingMode: 'environment' }).catch(() =>
+        open({ facingMode: 'environment' }),
+      )
+      // 후면 카메라가 여러 개인 폰은 초광각(0.6배, 가장자리 휘어짐)이 잡히기도 함 → 메인 렌즈로 다시 열기
+      if (!mainCamId) {
+        const backs = (await md.enumerateDevices()).filter(
+          (d) => d.kind === 'videoinput' && /back|rear|environment|후면/i.test(d.label),
+        )
+        // 안드로이드 라벨 "camera2 0, facing back" → 번호가 가장 작은 게 메인 렌즈
+        const num = (d: MediaDeviceInfo) => Number(d.label.match(/camera2? (\d+)/)?.[1] ?? 99)
+        const main = backs.sort((a, b) => num(a) - num(b))[0]
+        if (main) {
+          mainCamId = main.deviceId
+          if (s.getVideoTracks()[0]?.getSettings().deviceId !== main.deviceId) {
+            s.getTracks().forEach((t) => t.stop())
+            s = await open({ deviceId: { exact: main.deviceId } })
+          }
+        }
+      }
+      if (cancelled) return s.getTracks().forEach((t) => t.stop())
+      stream = s
+      // 연속 자동 초점 (지원하는 폰에서만, 실패해도 무시)
+      const track = s.getVideoTracks()[0] as any
+      if (track?.getCapabilities?.().focusMode?.includes('continuous'))
+        track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
+      if (videoRef.current) videoRef.current.srcObject = s
+    })().catch(() => !cancelled && setError(true))
     return () => {
       cancelled = true
       stream?.getTracks().forEach((t) => t.stop())
@@ -333,14 +385,6 @@ type Entry = { step: GuideStep; photo: string } // 지나온 안내 + 그때 찍
 
 // 보조 기능: 지원될 때만 조용히 실행
 const vibrate = () => navigator.vibrate?.(100)
-const speak = (text: string) => {
-  if (!('speechSynthesis' in window)) return
-  speechSynthesis.cancel()
-  const u = new SpeechSynthesisUtterance(text)
-  u.lang = 'ko-KR'
-  u.rate = 0.9 // 조금 천천히
-  speechSynthesis.speak(u)
-}
 
 // 선택 내용 한 줄 요약 (예: "포장 · 라떼 · 카드")
 const summarize = (c: Ctx) =>
@@ -365,13 +409,20 @@ export function GuidePage() {
   const cur = last?.step
 
   // 화면 꺼짐 방지 (지원될 때만)
+  // 카메라 앱·갤러리에 다녀오면 자동으로 풀리므로 화면이 다시 보일 때 재요청
   useEffect(() => {
     let lock: { release: () => Promise<void> } | null = null
-    ;(navigator as any).wakeLock
-      ?.request('screen')
-      .then((l: any) => (lock = l))
-      .catch(() => {})
+    const request = () => {
+      if (document.visibilityState !== 'visible') return
+      ;(navigator as any).wakeLock
+        ?.request('screen')
+        .then((l: any) => (lock = l))
+        .catch(() => {})
+    }
+    request()
+    document.addEventListener('visibilitychange', request)
     return () => {
+      document.removeEventListener('visibilitychange', request)
       lock?.release().catch(() => {})
       if ('speechSynthesis' in window) speechSynthesis.cancel()
     }
@@ -390,9 +441,9 @@ export function GuidePage() {
           ? '주문이 끝났어요. 영수증의 주문 번호를 확인해주세요'
           : cur?.message ?? ''
 
-  // 문구가 바뀔 때마다 읽어줌 (소리 켬일 때만, 첫 화면은 사용자가 누르기 전이라 생략)
+  // 문구가 바뀔 때마다 읽어줌 (소리 켬일 때만, 첫 안내부터)
   useEffect(() => {
-    if (sound && (status !== 'camera' || history.length)) speak(message)
+    if (sound) speak(message)
   }, [message, status, sound]) // eslint-disable-line
 
   const toggleSound = () => {
@@ -505,11 +556,11 @@ export function GuidePage() {
   const warn = kind === 'retake' || kind === 'wrong' || (status === 'camera' && !!notice) // 예외 안내는 빨간 글씨
 
   return (
-    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col">
-      {/* 맨 위: 작은 뒤로/소리 버튼 + 고른 내용 (잘리지 않게 줄바꿈) */}
-      <div className="shrink-0 flex items-start gap-2 px-3 pt-2 pb-2">
+    <div className="h-dvh w-full max-w-md mx-auto bg-stone-50 text-gray-950 flex flex-col">
+      {/* 맨 위: 작은 이전/소리 버튼 + 고른 내용 (잘리지 않게 줄바꿈) */}
+      <div className="shrink-0 flex items-start gap-3 px-3 pt-2 pb-2">
         <button onClick={goBack} disabled={status === 'analyzing'} className={`${SMALL} bg-white text-gray-950`}>
-          뒤로
+          이전
         </button>
         <p className="flex-1 min-w-0 pt-2 text-xl font-extrabold text-center leading-snug break-keep">
           {summarize(ctx)}
@@ -532,15 +583,15 @@ export function GuidePage() {
         />
       </div>
 
-      {/* 하단: 안내 문구(최대 2줄) → 칩 줄(최대 2개) → 메인 버튼 1개 */}
-      <div className="shrink-0 p-3 flex flex-col gap-3">
+      {/* 하단: 안내 문구(최대 3줄) → 칩 줄(최대 2개) → 메인 버튼 1개 */}
+      <div className="shrink-0 p-4 flex flex-col gap-4">
         <p
-          className={`min-h-[64px] text-2xl font-extrabold leading-8 line-clamp-2 break-keep ${warn ? 'text-red-700' : ''}`}
+          className={`min-h-[64px] text-2xl font-extrabold leading-8 line-clamp-3 break-keep ${warn ? 'text-red-700' : ''}`}
         >
           {message}
         </p>
         {/* 칩이 없어도 자리를 유지해서 카메라 크기가 출렁이지 않게 함 */}
-        <div className="grid grid-cols-2 gap-3 h-[60px]">
+        <div className="grid grid-cols-2 gap-4 h-[60px]">
           {status === 'camera' ? (
             // 카메라 상태: 칩 자리에 갤러리 버튼
             <button onClick={() => fileRef.current?.click()} className={`${SECONDARY} col-span-2`}>
@@ -556,16 +607,25 @@ export function GuidePage() {
               <button
                 key={c}
                 onClick={() => onChip(c)}
-                className={`${BTN} min-h-[60px] px-2 truncate text-xl border-[3px] border-green-800 ${
+                className={`${BTN} min-h-[60px] px-2 text-xl leading-tight break-keep border-[3px] border-green-800 ${
                   isAsk ? 'bg-green-800 text-white' : 'bg-white active:bg-gray-100'
                 }`}
               >
-                {c}
+                {/* 긴 메뉴명은 잘리지 않게 2줄까지 줄바꿈 */}
+                <span className="line-clamp-2">{c}</span>
               </button>
             ))
           )}
         </div>
-        <button onClick={action.onClick} disabled={status === 'analyzing' || isAsk} className={PRIMARY}>
+        <button
+          onClick={action.onClick}
+          disabled={status === 'analyzing' || isAsk}
+          className={
+            status === 'analyzing'
+              ? PRIMARY.replace('disabled:bg-gray-300 disabled:text-gray-700', 'disabled:bg-[#5b7a66] disabled:text-white') // 기존 녹색의 채도만 낮춘 색 (흰 글씨 대비 4.7:1)
+              : PRIMARY
+          }
+        >
           {action.label}
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
