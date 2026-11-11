@@ -21,7 +21,7 @@ const steps = [
 ];
 const stageTitles = { place: '포장·매장 선택', menu: '메뉴 선택', payment: '결제 안내', complete: '주문 완료' };
 const state = { screen: 'setup', step: 0, settings: { place: '', store: '', category: '', payment: '' }, custom: '', mode: 'real', demoType: 'cafe', stage: 'place', result: null, image: '', selected: 0, busy: false, error: '', configured: false, sound: false };
-let stream, generation = 0;
+let stream, generation = 0, selectedCameraId = '';
 
 function say(text) {
   if (!state.sound || !('speechSynthesis' in window)) return;
@@ -106,18 +106,73 @@ function positionTarget() {
 new ResizeObserver(positionTarget).observe(app);
 window.addEventListener('resize', positionTarget);
 
-async function openCamera() {
-  if (!navigator.mediaDevices?.getUserMedia) { $('#capture').click(); return; }
+async function openCamera(deviceId = selectedCameraId) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    notify('이 브라우저에서는 실시간 카메라를 사용할 수 없어요. localhost 또는 HTTPS로 접속하거나 사진 선택을 이용해 주세요.');
+    return;
+  }
   const token = ++generation;
+  let camera;
   try {
     stopCamera();
-    const camera = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    const videoOptions = deviceId ? { deviceId: { exact: deviceId } }
+      : matchMedia('(pointer: coarse)').matches ? { facingMode: { ideal: 'environment' } } : true;
+    // Desktop cameras use their default resolution; do not force a mobile rear-camera preference.
+    camera = await navigator.mediaDevices.getUserMedia({ video: videoOptions, audio: false });
     if (token !== generation || state.screen !== 'guide') { camera.getTracks().forEach(t => t.stop()); return; }
     stream = camera; resetResult(); state.image = ''; renderGuide();
     $('#viewfinder').innerHTML = '<video id="video" autoplay playsinline muted aria-label="키오스크 실시간 카메라"></video><div class="camera-reticle" aria-hidden="true"></div>';
-    $('#video').srcObject = stream;
-    await $('#video').play(); notify('화면 전체가 보이면 아래 ‘화면 촬영’을 눌러 주세요.');
-  } catch { stopCamera(); notify('카메라를 열지 못했어요. 촬영 또는 사진 선택을 이용해 주세요.'); $('#capture').click(); }
+    const video = $('#video'); video.srcObject = camera;
+    await video.play();
+    if (token !== generation || stream !== camera) return;
+    const track = camera.getVideoTracks()[0];
+    selectedCameraId = track?.getSettings().deviceId || deviceId;
+    await showCameraChoices(camera, token);
+    if (token !== generation || stream !== camera) return;
+    if (track) track.onended = () => {
+      if (stream !== camera || state.screen !== 'guide') return;
+      stopCamera(); state.error = '카메라 연결이 끊겼어요. 카메라를 다시 켜거나 사진을 선택해 주세요.'; renderGuide();
+    };
+    notify('영상이 나오지 않으면 아래 ‘사용할 카메라’에서 실제 웹캠을 선택해 주세요.');
+  } catch (error) {
+    camera?.getTracks().forEach(track => track.stop());
+    if (token !== generation) return;
+    stopCamera();
+    const messages = {
+      NotAllowedError: '브라우저 또는 Windows에서 카메라 접근을 허용해 주세요.',
+      NotFoundError: '선택한 카메라를 찾지 못했어요. 다시 켜거나 사진을 선택해 주세요.',
+      NotReadableError: '카메라 영상을 읽지 못했어요. 다른 카메라 앱을 종료하거나 브라우저의 카메라 설정에서 실제 웹캠을 선택해 주세요.',
+      OverconstrainedError: '선택한 카메라를 사용할 수 없어요. 다시 켜거나 다른 카메라를 선택해 주세요.'
+    };
+    selectedCameraId = '';
+    state.error = messages[error.name] || '카메라 영상을 재생하지 못했어요. 다른 브라우저 또는 사진 선택을 이용해 주세요.';
+    renderGuide(); notify(state.error);
+  }
+}
+async function showCameraChoices(camera, token) {
+  // Camera labels become available after permission. Device labels are rendered as text only.
+  let devices = [];
+  try { devices = (await navigator.mediaDevices.enumerateDevices()).filter(device => device.kind === 'videoinput' && device.deviceId); }
+  catch { /* Keep the working stream even when listing additional cameras is unavailable. */ }
+  if (token !== generation || stream !== camera || !$('#viewfinder')) return;
+  const controls = document.createElement('div'); controls.className = 'camera-settings';
+  const label = document.createElement('label'); label.htmlFor = 'camera-device'; label.textContent = '사용할 카메라';
+  const select = document.createElement('select'); select.id = 'camera-device';
+  const track = camera.getVideoTracks()[0];
+  if (!devices.some(device => device.deviceId === selectedCameraId)) {
+    const current = document.createElement('option'); current.value = selectedCameraId;
+    current.textContent = track?.label || '현재 카메라'; select.append(current);
+  }
+  devices.forEach((device, i) => {
+    const option = document.createElement('option'); option.value = device.deviceId;
+    option.textContent = device.label || `카메라 ${i + 1}`; select.append(option);
+  });
+  select.value = selectedCameraId;
+  select.onchange = () => openCamera(select.value);
+  const hint = document.createElement('p');
+  hint.textContent = '검은 화면이나 빨간 X가 보이면 목록에서 다른 카메라를 선택해 주세요. 가상 카메라 대신 실제 웹캠을 선택해 주세요.';
+  controls.append(label, select, hint);
+  app.querySelector('.camera-tools').after(controls);
 }
 function captureFrame() {
   const video = $('#video'); if (!video?.videoWidth) return notify('카메라가 준비될 때까지 잠시 기다려 주세요.');
