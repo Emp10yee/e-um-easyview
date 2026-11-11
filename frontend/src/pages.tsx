@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { ReactNode, RefObject } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import {
   analyzeFrame,
   answerClarification,
@@ -38,7 +38,7 @@ export const useAppCtx = () => useContext(AppContext)
 const BTN = 'touch-manipulation active:scale-95 rounded-2xl font-extrabold'
 const PRIMARY = `${BTN} min-h-[72px] w-full text-2xl bg-green-800 text-white active:bg-green-900 disabled:bg-gray-300 disabled:text-gray-700`
 const SECONDARY = `${BTN} min-h-[60px] text-xl bg-white text-gray-950 border-[3px] border-green-800 active:bg-gray-100 disabled:opacity-40`
-// 맨 위 작은 버튼 (이전/뒤로, 소리) — 사용자 요청으로 60px 규칙 예외
+// 맨 위 작은 버튼 (뒤로, 소리) — 사용자 요청으로 60px 규칙 예외
 const SMALL = `${BTN} shrink-0 min-h-[48px] px-3 text-xl border-2 border-green-800 disabled:opacity-40`
 
 const CUSTOM = '직접 입력'
@@ -48,37 +48,40 @@ export function IntroPage() {
   const navigate = useNavigate()
   const [logoOk, setLogoOk] = useState(true) // 로고 파일이 없으면 글자로 대신
   return (
-    // 모든 요소를 화면 가운데에 모음 (중요한 건 중앙에)
-    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col items-center justify-center text-center px-6 py-8">
-      {/* 서비스명: 로고(이지뷰 폭의 약 45%) → 이지뷰(크게) → EasyView(이지뷰 폭의 약 70%), 촘촘하게 */}
-      {logoOk && (
-        <img src="/logo.png" alt="이지뷰 로고" onError={() => setLogoOk(false)} className="w-24 object-contain mb-6" />
-      )}
-      <h1 className="text-7xl font-extrabold text-green-800 leading-none">이지뷰</h1>
-      <p className="text-3xl font-extrabold text-green-800 leading-none mt-2">EasyView</p>
-      {/* 여백 → 문구 */}
-      <p className="mt-10 text-2xl font-bold leading-snug break-keep">
-        화면 찍고, 따라 보고, 주문하고!
-        <br />
-        어려운 주문도 쉽게 할 수 있어요
-      </p>
-      {/* 큰 여백 → 버튼 */}
-      <div className="w-full flex flex-col items-center gap-3 mt-20">
-        <button onClick={() => navigate('/setup')} className={PRIMARY}>
+    <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col items-center text-center px-6 pt-8 pb-6">
+      {/* 가운데 영역: 중요한 건 화면 중앙에 */}
+      <div className="flex-1 w-full flex flex-col items-center justify-center">
+        {/* 서비스명: 로고(이지뷰 폭의 약 45%) → 이지뷰(크게) → EasyView(이지뷰 폭의 약 70%) */}
+        {logoOk && (
+          <img src="/logo.png" alt="이지뷰 로고" onError={() => setLogoOk(false)} className="w-32 object-contain mb-6" />
+        )}
+        <h1 className="text-7xl font-extrabold text-green-800 leading-none">이지뷰</h1>
+        <p className="text-3xl font-extrabold text-yellow-400 leading-none mt-2">EasyView</p>
+        {/* 여백 → 문구 */}
+        <p className="mt-10 text-2xl font-bold leading-snug break-keep">
+          화면 찍고, 따라 보고, 주문하고!
+          <br />
+          어려운 주문도 쉽게 할 수 있어요
+        </p>
+        {/* 큰 여백 → 버튼 */}
+        <button onClick={() => navigate('/setup')} className={`${PRIMARY} mt-20`}>
           주문 시작하기
         </button>
-        <p className="text-xl font-bold text-gray-700">E:UM</p>
       </div>
+      {/* 맨 아래: 팀명 */}
+      <p className="text-xl font-bold text-gray-700">E:UM</p>
     </div>
   )
 }
 
 // ===== 설정 화면 `/setup` (사전 설정 4단계) =====
 export function StartPage() {
-  const { setCtx } = useAppCtx()
+  const { ctx, setCtx } = useAppCtx()
   const navigate = useNavigate()
-  const [step, setStep] = useState(0)
-  const [sel, setSel] = useState<Ctx>(EMPTY_CTX)
+  // 가이드에서 '뒤로'로 왔으면 고른 내용을 유지한 채 마지막(계산 방법) 단계부터
+  const fromGuide = !!(useLocation().state as any)?.toLast && !!ctx.payment
+  const [step, setStep] = useState(fromGuide ? 3 : 0)
+  const [sel, setSel] = useState<Ctx>(fromGuide ? ctx : EMPTY_CTX)
   const [typing, setTyping] = useState(false) // 메뉴 직접 입력 중
   const [text, setText] = useState('')
 
@@ -149,8 +152,17 @@ export function StartPage() {
         ))}
       </div>
 
+      {/* 지금까지 고른 내용 (첫 단계는 비어 있어도 자리 유지) */}
+      <p className="min-h-[28px] mt-4 text-xl font-bold text-green-800 break-keep">
+        {steps
+          .slice(0, step)
+          .map((st) => (st.key === 'dineType' ? (sel.dineType.startsWith('포장') ? '포장' : '매장') : sel[st.key]))
+          .filter(Boolean)
+          .join(' · ')}
+      </p>
+
       {/* 질문 */}
-      <h1 className="text-3xl font-extrabold leading-snug mt-6 mb-4 break-keep">
+      <h1 className="text-3xl font-extrabold leading-snug mt-3 mb-4 break-keep">
         {typing ? '드시고 싶은 메뉴를 적어주세요' : cur.q}
       </h1>
 
@@ -283,10 +295,10 @@ function CameraView({
           />
         )}
         <div className="absolute inset-0 pointer-events-none">
-          {/* 빨강 박스 + 굵은 흰 테두리 (빨간 배경에서도 보이게, 깜빡임은 주의를 뺏어서 안 씀) */}
+          {/* 누를 곳: 노랑 + 진한 녹색 바깥 테두리 (녹색 테마와 어울리고 밝은/어두운 화면 모두에서 보이게, 깜빡임 없음) */}
           {box && (
             <div
-              className="absolute border-[6px] border-red-600 rounded-lg shadow-[0_0_0_4px_white]"
+              className="absolute border-[3px] border-yellow-400 rounded-md shadow-[0_0_0_2px_#14532d]"
               style={boxStyle(box)}
             />
           )}
@@ -297,11 +309,11 @@ function CameraView({
       {error && !photo && !box && (
         <div className="absolute inset-0 bg-gray-950 text-white flex flex-col items-center justify-center gap-6 p-6 text-center">
           <p className="text-2xl font-extrabold leading-snug break-keep">
-            카메라를 켤 수 없어요
+            카메라 화면을 띄울 수 없어요
             <br />
-            카메라 사용을 허용하거나
+            아래 버튼으로 사진을 찍거나
             <br />
-            아래 &apos;사진 불러오기&apos;를 눌러주세요
+            불러와주세요
           </p>
           <button
             onClick={() => setRetry(retry + 1)}
@@ -345,8 +357,9 @@ export function GuidePage() {
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
+  const captureRef = useRef<HTMLInputElement>(null)
   const [status, setStatus] = useState<Status>('camera')
-  const [history, setHistory] = useState<Entry[]>([]) // 지나온 안내 (이전 버튼용)
+  const [history, setHistory] = useState<Entry[]>([]) // 지나온 안내 (단계 번호·이어 보낼 정보용)
   const [pending, setPending] = useState('') // 분석 중인(또는 마지막) 사진
   const last = history[history.length - 1]
   const cur = last?.step
@@ -365,15 +378,16 @@ export function GuidePage() {
   }, [])
 
   // 상태별 문구
+  // 카메라 상태의 알림 (사진 불러오기 실패 등). 다른 사진을 고르거나 찍으면 지움
+  const [notice, setNotice] = useState('')
+
   const message =
     status === 'camera'
-      ? history.length
-        ? '바뀐 화면을 다시 찍어주세요'
-        : '키오스크 화면을 찍어주세요'
+      ? notice || (history.length ? '바뀐 화면을 찍어주세요' : '키오스크 화면이 꽉 차게 가까이 찍어주세요')
       : status === 'analyzing'
         ? '화면을 살펴보고 있어요'
         : status === 'done'
-          ? '주문이 끝났어요!'
+          ? '주문이 끝났어요. 영수증의 주문 번호를 확인해주세요'
           : cur?.message ?? ''
 
   // 문구가 바뀔 때마다 읽어줌 (소리 켬일 때만, 첫 화면은 사용자가 누르기 전이라 생략)
@@ -390,6 +404,7 @@ export function GuidePage() {
   // 사진(dataURL) → analyzeFrame → guiding 또는 done
   const analyze = async (img: string) => {
     vibrate()
+    setNotice('')
     setPending(img)
     setStatus('analyzing')
     const step = await analyzeFrame(img.split(',')[1] ?? '', ctx, history.length, cur)
@@ -401,16 +416,26 @@ export function GuidePage() {
     }
   }
 
-  // 사진 찍기 (카메라 없으면 빈 사진으로 목 흐름 진행)
-  const takePhoto = () => analyze(captureFrame(videoRef.current))
+  // 사진 찍기
+  // 화면 카메라가 안 켜졌을 때: 폰이면 폰 기본 카메라 앱으로, PC면 빈 사진으로 목 흐름 진행(시연용)
+  const takePhoto = () => {
+    const img = captureFrame(videoRef.current)
+    if (!img && matchMedia('(pointer: coarse)').matches) return captureRef.current?.click()
+    analyze(img)
+  }
 
-  // 갤러리에서 사진 불러오기
+  // 갤러리 / 폰 카메라 앱에서 받은 사진
   const onFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = '' // 같은 사진 다시 골라도 동작하게
     if (!file) return
     const img = await loadPhoto(file)
     if (img) analyze(img)
+    else {
+      // HEIC 등 열 수 없는 사진 → 조용히 무시하지 않고 알려줌
+      vibrate()
+      setNotice('사진을 열지 못했어요. 다른 사진을 골라주세요')
+    }
   }
 
   // 다음 단계 → 다시 카메라로
@@ -425,17 +450,11 @@ export function GuidePage() {
     setHistory([...history.slice(0, -1), { ...last, step: pickAlternative(cur, name) }])
   }
 
-  // 이전: 완료 → 마지막 안내 / 카메라 → 마지막 안내 / 안내 중 → 직전 안내 / 첫 안내 → 카메라 / 처음 → 시작 화면
+  // 뒤로: 언제든 설정 화면의 계산 방법 단계로 (다시 찍기는 메인 버튼으로 하니, 뒤로는 선택을 바꾸고 싶은 것)
   const goBack = () => {
     vibrate()
     if (status === 'analyzing') return
-    if ((status === 'done' || status === 'camera') && cur) return setStatus('guiding')
-    if (status === 'guiding' && history.length > 1) return setHistory(history.slice(0, -1))
-    if (status === 'guiding') {
-      setHistory([])
-      return setStatus('camera')
-    }
-    navigate('/setup')
+    navigate('/setup', { state: { toLast: true } })
   }
 
   const restart = () => {
@@ -483,14 +502,14 @@ export function GuidePage() {
   // 칩: 질문이면 답변, 아니면 대안 메뉴 (최대 2개)
   const chips = status !== 'guiding' ? [] : ((isAsk ? cur?.choices : cur?.alternatives) ?? []).slice(0, 2)
   const onChip = isAsk ? answer : chooseAlt
-  const warn = kind === 'retake' || kind === 'wrong' // 예외 안내는 빨간 글씨
+  const warn = kind === 'retake' || kind === 'wrong' || (status === 'camera' && !!notice) // 예외 안내는 빨간 글씨
 
   return (
     <div className="h-dvh w-full max-w-md mx-auto bg-white text-gray-950 flex flex-col">
-      {/* 맨 위: 작은 이전/소리 버튼 + 고른 내용 (잘리지 않게 줄바꿈) */}
+      {/* 맨 위: 작은 뒤로/소리 버튼 + 고른 내용 (잘리지 않게 줄바꿈) */}
       <div className="shrink-0 flex items-start gap-2 px-3 pt-2 pb-2">
         <button onClick={goBack} disabled={status === 'analyzing'} className={`${SMALL} bg-white text-gray-950`}>
-          이전
+          뒤로
         </button>
         <p className="flex-1 min-w-0 pt-2 text-xl font-extrabold text-center leading-snug break-keep">
           {summarize(ctx)}
@@ -527,6 +546,11 @@ export function GuidePage() {
             <button onClick={() => fileRef.current?.click()} className={`${SECONDARY} col-span-2`}>
               사진 불러오기
             </button>
+          ) : kind === 'action' ? (
+            // 기기에서 하는 행동: 버튼처럼 보이지 않게 글자만 (화면 누르기와 구분)
+            <p className="col-span-2 self-center text-xl font-extrabold text-green-800">
+              화면 밖에서 이렇게 해주세요
+            </p>
           ) : (
             chips.map((c) => (
               <button
@@ -545,6 +569,8 @@ export function GuidePage() {
           {action.label}
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onFile} />
+        {/* 화면 카메라가 안 될 때 폰 기본 카메라 앱으로 찍기 */}
+        <input ref={captureRef} type="file" accept="image/*" capture="environment" hidden onChange={onFile} />
       </div>
     </div>
   )

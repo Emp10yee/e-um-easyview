@@ -4,7 +4,8 @@ import type { Ctx } from './pages'
 // 텍스트 직접 입력은 금지 규칙이라 '직접 입력' 칩은 넣지 않음
 // 모든 매장이 항상 4단계로 가도록 기타도 넓은 프리셋을 둠
 export const PRESETS: Record<string, string[]> = {
-  카페: ['시원한 아메리카노', '따뜻한 아메리카노', '라떼', '차 / 에이드', '디저트'],
+  // 차갑게/따뜻하게는 키오스크에서 나올 때 고르면 됨 (안내 중 확인 질문)
+  카페: ['아메리카노', '라떼', '차 / 에이드', '다른 음료'],
   '햄버거·패스트푸드': ['불고기 / 치즈 버거', '치킨 버거', '새우 버거', '감자튀김 / 사이드'],
   기타: ['식사', '간식 / 디저트'],
 }
@@ -60,7 +61,19 @@ function mockScript(ctx: Ctx): GuideStep[] {
       ? [{ kind: 'ask', message: '빨대·뚜껑 같은 일회용품이 필요한지 골라주세요', box: null, alternatives: [], choices: ['필요해요', '필요 없어요'], mock: true } as GuideStep]
       : []),
     g("아래 '결제하기'를 눌러주세요", [820, 300, 960, 700]),
+    // 결제: 고른 결제 방법 버튼 → 기기에서 하는 행동(action, 박스 없음) → 다음 호출에서 끝
+    ...payMock(ctx.payment),
   ]
+}
+
+// 결제 방법별 목 안내 (화면 버튼 1개 + 기기 행동 1개)
+function payMock(payment: string): GuideStep[] {
+  const act = (message: string): GuideStep => ({ kind: 'action', message, box: null, alternatives: [], mock: true })
+  if (payment.startsWith('모바일'))
+    return [g("'쿠폰 사용'을 눌러주세요", [400, 520, 560, 920]), act('쿠폰 바코드를 화면 아래 스캐너에 보여주세요')]
+  if (payment.startsWith('간편'))
+    return [g("'간편결제'를 눌러주세요", [600, 80, 760, 480]), act('휴대폰 결제 바코드를 스캐너에 보여주세요')]
+  return [g("'카드 결제'를 눌러주세요", [400, 80, 560, 480]), act('카드를 결제 기계에 대고 끝날 때까지 기다려주세요')]
 }
 
 // 이미지/영상을 가로 최대 960px JPEG dataURL로 줄임 (화면 표시 + 분석 전송 겸용)
