@@ -108,6 +108,7 @@ HTTP 200. 좌표는 형식 설명을 위한 예시이며 실제 사진의 검증
 
 - `stage`: 사진에서 판별한 현재 단계. 요청의 previousStage를 자동 증가시키지 않습니다.
 - `kind`: 안내 종류. 아래 표 기준으로 화면을 처리하세요.
+- `interaction`: `touch`(화면 버튼), `physical`(기기에서 할 행동·처리 대기), `none`(질문·재촬영·완료 등). 박스가 없는 정상 행동과 인식 실패를 구분합니다.
 - `candidates`: 기본 추천이 첫 번째인 좌표 목록. 동일 이름의 중복 후보는 거부합니다.
 - `box`: 기본 추천 좌표 또는 null.
 - `alternatives`: 기본 추천을 제외한 대안 이름 목록. React 기존 필드와 호환하도록 문자열 배열을 유지합니다.
@@ -118,12 +119,35 @@ HTTP 200. 좌표는 형식 설명을 위한 예시이며 실제 사진의 검증
 | kind | 화면 처리 | 좌표 및 완료 |
 | --- | --- | --- |
 | guide | 현재 누를 버튼 안내 | 후보 1개 이상, completed=false |
+| action | 카드 대기·삽입·회수, 바코드 제시, 영수증 받기, 처리 대기 등 | 후보 없음, box=null, choices=[], completed=false, interaction=physical |
 | retake | 사진을 다시 찍도록 안내 | 후보 없음, box=null, completed=false |
 | wrong | 잘못 들어간 키오스크 화면의 복귀 안내 | 보이는 복귀 버튼만 후보로 허용. 없으면 box=null. completed=false |
 | ask | 누락된 선호를 두 선택지로 확인 | 후보 없음, box=null, completed=false |
 | complete | 영수증·주문 번호 확인 안내 | stage=complete, 후보 없음, completed=true |
 
 retake와 ask를 완료로 처리하지 않습니다. stage=complete와 kind=complete는 항상 함께여야 합니다. 빈 후보 배열 자체는 완료 근거가 아닙니다. 모순된 모델 응답은 성공으로 돌려주지 않고 502로 거부합니다.
+
+### 화면 버튼과 물리적 행동
+
+`kind=guide`에서는 실제 누를 버튼의 위치를 표시합니다. `kind=action`에서는 안내 문구만 표시하며, 화면에 그려진 카드·단말기 그림이나 취소 버튼을 클릭 대상으로 대신 지정하지 않습니다. 카드 대기/삽입/회수 방법은 현재 화면에 적힌 지시를 따릅니다. 대라고 적힌 화면에서 임의로 꽂으라고 안내하지 않으며, 기기의 왼쪽·오른쪽 위치는 화면에서 명시한 경우에만 전달합니다.
+
+카드 사용자에게는 카드 지침을, 쿠폰 사용자에게는 바코드 지침을 우선 안내합니다. 결제 안내나 대기는 완료 증거가 아니므로 `stage=payment`, `completed=false`를 유지합니다. 사용자가 행동 후 바뀐 화면을 다시 촬영해야 다음 단계를 판단합니다.
+
+```json
+{
+  "stage": "payment",
+  "kind": "action",
+  "store": "스타벅스",
+  "message": "카드를 화면 안내에 따라 오른쪽 결제 단말기에 가까이 대어 주세요. 결제가 끝날 때까지 기다려 주세요.",
+  "candidates": [],
+  "box": null,
+  "alternatives": [],
+  "alternativeTargets": [],
+  "choices": [],
+  "completed": false,
+  "interaction": "physical"
+}
+```
 
 ### 좌표 표시
 
@@ -141,7 +165,7 @@ kind=ask 응답의 message와 choices를 보여 주고 사용자가 답하면 co
 
 1. `analyzeFrame`의 목 호출을 `/api/analyze` fetch로 교체하고 ctx, 이미지, previousStage, context를 보냅니다.
 2. 응답의 completed=true일 때만 기존 화면의 완료 흐름(null 반환 등)으로 연결합니다. GuideStep에 complete를 그대로 넣으면 기존 StepKind와 타입이 맞지 않습니다.
-3. guide/retake/wrong/ask는 기존 GuideStep 필드로 넘기되 alternativeTargets를 별도 보관하거나 타입에 추가합니다.
+3. guide/retake/wrong/ask는 기존 GuideStep 필드로 넘기되 alternativeTargets를 별도 보관하거나 타입에 추가합니다. action은 React의 StepKind에도 추가하고, 박스 없는 정상 행동 안내로 표시해야 합니다. retake나 완료로 매핑하지 마세요. 기존 시연 UI는 action을 지원하도록 보완했습니다.
 4. `pickAlternative`의 고정 좌표 대신 이번 API 응답의 대안 좌표를 사용하고 selectedMenu를 유지합니다.
 5. 실제 API 오류를 목 데이터로 대체하지 않습니다. 오류 안내와 가상 시연은 분리합니다.
 
@@ -190,6 +214,7 @@ FRONTEND_ORIGINS=https://frontend.example.com
 - 기존 시연 응답 호환: 테스트 확인
 - 실제 BAZE Gateway 호출·스타벅스/학식 사진 인식: 키와 사진이 없어 미검증
 - React 실제 API 호출 및 현장 PC 시연: 후속 작업
+- 제공된 통합 결제 화면의 키오스크 영역으로 실제 Gateway 검증: 카드/삼성페이 대기 안내, kind=action, box=null, completed=false 반환 확인
 - 제공된 스타벅스 모닝세트 화면의 키오스크 영역으로 실제 Gateway 회귀 검증: 라떼 요청에 `kind=guide`, `label=음료`, 유효한 탭 좌표 반환 확인. 다른 화면의 정확도까지 보장하는 결과는 아닙니다.
 
 ## 학교 Gateway 연결 설정

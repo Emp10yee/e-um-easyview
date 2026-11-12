@@ -31,7 +31,7 @@ test('rejects invalid objects, enums, conflicting inputs and mismatched image ty
 });
 test('explicit kinds reject contradictory completion and uncertain boxes', () => {
   for (const value of [{ ...guidance, kind: undefined }, { ...guidance, kind: 'complete' }, { ...guidance, kind: 'retake' }, { ...guidance, kind: 'ask', candidates: [], choices: [] }, { ...guidance, candidates: [null] }]) assert.throws(() => validateAnalysis(value, { requireKind: true }));
-  for (const kind of ['retake', 'wrong', 'ask', 'complete']) {
+  for (const kind of ['action', 'retake', 'wrong', 'ask', 'complete']) {
     const result = validateAnalysis({ ...guidance, kind, stage: kind === 'complete' ? 'complete' : 'menu', candidates: [], choices: kind === 'ask' ? ['차갑게', '따뜻하게'] : [] }, { requireKind: true });
     assert.equal(result.box, null); assert.equal(result.completed, kind === 'complete');
   }
@@ -58,12 +58,22 @@ test('HTTP analysis preserves legacy fields and returns alternative targets', as
   assert.equal(request.messages[0].content[1].image_url.url, `data:image/png;base64,${image}`);
   assert.equal(request.response_format.json_schema.strict, true);
 });
-test('HTTP distinguishes retake, ask and complete without inferring from empty candidates', async t => {
-  for (const kind of ['retake', 'ask', 'complete']) {
+test('HTTP distinguishes physical action, retake, ask and complete without inferring from empty candidates', async t => {
+  for (const kind of ['action', 'retake', 'ask', 'complete']) {
     const { post } = await launch(t, { fetchImpl: async () => upstream({ ...guidance, kind, stage: kind === 'complete' ? 'complete' : 'menu', candidates: [], choices: kind === 'ask' ? ['차갑게', '따뜻하게'] : [] }) });
     const res = await post(input); assert.equal(res.status, 200);
     const result = await res.json(); assert.equal(result.kind, kind); assert.equal(result.completed, kind === 'complete');
+    if (kind === 'action') { assert.equal(result.interaction, 'physical'); assert.equal(result.box, null); assert.deepEqual(result.candidates, []); }
   }
+});
+
+test('physical payment actions do not accept invented screen targets, choices or completion', () => {
+  const action = { stage: 'payment', kind: 'action', message: '카드를 결제 단말기에 대어 주세요.', candidates: [], choices: [] };
+  const result = validateAnalysis(action, { requireKind: true });
+  assert.equal(result.interaction, 'physical'); assert.equal(result.completed, false); assert.equal(result.box, null);
+  assert.deepEqual(result.alternatives, []); assert.deepEqual(result.alternativeTargets, []);
+  for (const invalid of [{ ...action, candidates: guidance.candidates }, { ...action, choices: ['카드', '쿠폰'] }, { ...action, stage: 'complete' }]) assert.throws(() => validateAnalysis(invalid, { requireKind: true }));
+  assert.equal(validateAnalysis(guidance, { requireKind: true }).interaction, 'touch');
 });
 test('HTTP validates JSON, content type, size and configuration without leaking errors', async t => {
   const { base, post } = await launch(t, { apiKey: '', bodyLimit: 1000 });

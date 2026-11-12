@@ -17,7 +17,7 @@ export const analysisSchema = {
   required: ['stage', 'kind', 'store', 'message', 'candidates', 'choices'],
   properties: {
     stage: { type: 'string', enum: ['place', 'menu', 'payment', 'complete'] },
-    kind: { type: 'string', enum: ['guide', 'retake', 'wrong', 'ask', 'complete'] },
+    kind: { type: 'string', enum: ['guide', 'action', 'retake', 'wrong', 'ask', 'complete'] },
     store: { type: 'string' }, message: { type: 'string' },
     candidates: { type: 'array', items: { type: 'object', additionalProperties: false, required: ['label', 'box'], properties: { label: { type: 'string' }, box: boxSchema } } },
     choices: { type: 'array', items: { type: 'string' } }
