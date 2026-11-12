@@ -1,4 +1,6 @@
 import type { Ctx } from './pages'
+import { addCoordinateGrid } from './analysisImage'
+import { refineButtonBounds } from './buttonBounds'
 
 // ===== 매장 종류별 메뉴 카테고리 프리셋 =====
 // 텍스트 직접 입력은 금지 규칙이라 '직접 입력' 칩은 넣지 않음
@@ -142,12 +144,13 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
   // 오류로 다시 찍기여도 기억은 유지 (안 그러면 다음 사진에서 누른 내용을 잊음)
   const retakeKeep = (message: string): GuideStep => ({ ...retake(message), stage: prev?.stage, ...keep })
   let res: Response
+  const analysisImage = await addCoordinateGrid(imageBase64)
   try {
     res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        imageBase64,
+        imageBase64: analysisImage,
         mimeType: 'image/jpeg',
         ctx: {
           ...ctx,
@@ -169,6 +172,10 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
     return retakeKeep(data.error || '화면을 읽지 못했어요. 다시 찍어주세요')
   }
   if (data.kind === 'complete' || data.completed) return null
+  if (data.kind === 'guide' && data.box && data.candidates?.[0]?.label) {
+    data.box = await refineButtonBounds(imageBase64, data.candidates[0].label, data.box)
+    data.candidates[0].box = data.box
+  }
   return {
     kind: data.kind,
     message: data.message,
