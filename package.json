@@ -10,6 +10,7 @@
     "build:frontend": "npm --prefix frontend run build",
     "start": "npm --prefix backend start",
     "test": "npm --prefix backend test",
+    "test:frontend": "node --experimental-strip-types --test frontend/test/*.test.mjs",
     "check": "npm --prefix backend run check && node --check frontend/demo/app.js && node --check frontend/demo/demo.js"
   },
   "engines": { "node": ">=22.9" }
