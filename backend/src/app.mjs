@@ -1,11 +1,9 @@
 import http from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { frontendRoot, serveFrontend } from './lib/static.mjs';
 import { validateAnalysis, makePrompt } from './lib/guide.mjs';
 import { ApiError, normalizeRequest } from './lib/request.mjs';
 import { DEFAULT_GATEWAY_URL, DEFAULT_MODEL, gatewayEndpoint, gatewayRequest, parseGatewayResponse } from './lib/gateway.mjs';
 
-const root = new URL('../../frontend/demo/', import.meta.url);
-const files = { '/': ['index.html', 'text/html; charset=utf-8'], '/index.html': ['index.html', 'text/html; charset=utf-8'], '/styles.css': ['styles.css', 'text/css; charset=utf-8'], '/app.js': ['app.js', 'text/javascript; charset=utf-8'], '/demo.js': ['demo.js', 'text/javascript; charset=utf-8'] };
 const localOrigins = ['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'];
 
 function json(res, status, value) {
@@ -23,7 +21,7 @@ async function readBody(req, limit) {
   catch { throw new ApiError(400, 'INVALID_JSON', '요청 JSON 형식이 올바르지 않아요.'); }
 }
 
-export function createApp({ apiKey = process.env.BAZE_API_KEY, model = process.env.BAZE_MODEL || DEFAULT_MODEL, baseUrl = process.env.BAZE_BASE_URL || DEFAULT_GATEWAY_URL, fetchImpl = fetch, timeoutMs = 55_000, bodyLimit = 7_000_000, allowedOrigins = process.env.FRONTEND_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? localOrigins } = {}) {
+export function createApp({ apiKey = process.env.BAZE_API_KEY, model = process.env.BAZE_MODEL || DEFAULT_MODEL, baseUrl = process.env.BAZE_BASE_URL || DEFAULT_GATEWAY_URL, fetchImpl = fetch, timeoutMs = 55_000, bodyLimit = 7_000_000, staticRoot = frontendRoot, allowedOrigins = [...localOrigins, ...(process.env.FRONTEND_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? []), ...(process.env.RENDER_EXTERNAL_URL ? [process.env.RENDER_EXTERNAL_URL] : [])] } = {}) {
   if (typeof model !== 'string' || !/^[a-zA-Z0-9._/-]+$/.test(model)) throw new Error('BAZE_MODEL 설정을 확인해 주세요.');
   const endpoint = gatewayEndpoint(baseUrl);
   if (allowedOrigins.some(origin => { try { const parsed = new URL(origin); return !['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== origin; } catch { return true; } })) throw new Error('FRONTEND_ORIGINS에는 경로 없는 정확한 http(s) 출처만 입력해 주세요.');
@@ -86,10 +84,7 @@ export function createApp({ apiKey = process.env.BAZE_API_KEY, model = process.e
       }
       if (isApi) throw new ApiError(404, 'NOT_FOUND', 'API를 찾을 수 없어요.');
       if (!['GET', 'HEAD'].includes(req.method)) throw new ApiError(405, 'METHOD_NOT_ALLOWED', '지원하지 않는 요청입니다.');
-      if (!Object.hasOwn(files, url.pathname)) throw new ApiError(404, 'NOT_FOUND', '페이지를 찾을 수 없어요.');
-      const [name, type] = files[url.pathname];
-      const content = await readFile(new URL(name, root));
-      res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-cache' }); res.end(req.method === 'HEAD' ? undefined : content);
+      await serveFrontend(req, res, url.pathname, staticRoot);
     } catch (error) {
       if (res.destroyed || res.writableEnded) return;
       const known = error instanceof ApiError;
