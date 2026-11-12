@@ -36,12 +36,12 @@ test('explicit kinds reject contradictory completion and uncertain boxes', () =>
     assert.equal(result.box, null); assert.equal(result.completed, kind === 'complete');
   }
 });
-test('latest menu, options and clarification are carried in the prompt', () => {
-  const context = { selectedMenu: '매운 치킨버거', options: ['단품'], clarification: { question: '맵게 드실까요?', answer: '맵게' } };
+test('latest menu, options, pressed and clarification are carried in the prompt', () => {
+  const context = { selectedMenu: '매운 치킨버거', options: ['단품'], pressed: ['버거', '매운 치킨버거'], clarification: { question: '맵게 드실까요?', answer: '맵게' } };
   const normalized = normalizeRequest({ ...input, context });
   assert.deepEqual(normalized.context, context);
   const prompt = makePrompt(normalized.settings, 'menu', normalized.context);
-  assert.ok(prompt.includes(JSON.stringify(context))); assert.match(prompt, /not proof/);
+  assert.ok(prompt.includes(JSON.stringify(context))); assert.match(prompt, /not proof/); assert.match(prompt, /ALREADY pressed/);
 });
 test('HTTP analysis preserves legacy fields and returns alternative targets', async t => {
   let request, endpoint, headers;
