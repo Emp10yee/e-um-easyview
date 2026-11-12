@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: easyview
+    runtime: node
+    branch: main
+    buildCommand: npm --prefix frontend ci --include=dev && npm run build:frontend
+    startCommand: npm start
+    healthCheckPath: /api/status
+    envVars:
+      - key: NODE_VERSION
+        value: 24.15.0
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: BAZE_API_KEY
+        sync: false
+      - key: BAZE_MODEL
+        value: google/gemma-4-31B-it
+      - key: BAZE_BASE_URL
+        value: https://factchat-cloud.mindlogic.ai/v1/gateway

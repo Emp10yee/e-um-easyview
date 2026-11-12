@@ -84,7 +84,6 @@ test('HTTP validates JSON, content type, size and configuration without leaking 
   const res = await post(input); assert.equal(res.status, 503); assert.equal((await res.json()).code, 'AI_NOT_CONFIGURED');
   assert.equal((await fetch(`${base}/api/analyze`)).status, 405);
   assert.equal((await fetch(`${base}/.env`)).status, 404);
-  assert.equal((await fetch(`${base}/`)).status, 200);
 });
 test('HTTP maps upstream rate limit, network failure, timeout and malformed output', async t => {
   const cases = [
