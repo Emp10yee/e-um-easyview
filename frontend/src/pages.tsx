@@ -47,7 +47,9 @@ const PRIMARY = `${BTN} min-h-[72px] w-full text-2xl bg-green-800 text-white act
 
 const CUSTOM = '직접 입력'
 
-// 음성 안내: 지원될 때만 조용히 실행
+// 보조 기능(진동·음성 안내): 지원될 때만 조용히 실행
+const vibrate = () => navigator.vibrate?.(200)
+
 const speak = (text: string) => {
   if (!('speechSynthesis' in window)) return
   speechSynthesis.cancel()
@@ -75,7 +77,7 @@ export function IntroPage() {
         어려운 주문도 쉽게 할 수 있어요
       </p>
       {/* 소개 문구 바로 아래 시작 버튼 (팀명은 뺌) */}
-      <button onClick={() => navigate('/setup')} className={`${PRIMARY} mt-14`}>
+      <button onClick={() => { vibrate(); navigate('/setup') }} className={`${PRIMARY} mt-14`}>
         주문 시작하기
       </button>
     </div>
@@ -128,6 +130,7 @@ export function StartPage() {
   const [picked, setPicked] = useState('')
   const choose = (value: string) => {
     if (picked) return
+    vibrate()
     setPicked(value)
     setTimeout(() => {
       setPicked('')
@@ -139,11 +142,15 @@ export function StartPage() {
   }
 
   const submitText = () => {
-    if (text.trim()) advance({ ...sel, category: text.trim() })
+    if (text.trim()) {
+      vibrate()
+      advance({ ...sel, category: text.trim() })
+    }
   }
 
   const goBack = () => {
     if (picked) return
+    vibrate()
     if (typing) return setTyping(false)
     if (step === 0) return navigate('/') // 첫 단계 → 소개 화면
     setStep(step - 1)
@@ -166,6 +173,7 @@ export function StartPage() {
           </button>
           <button
             onClick={() => {
+              vibrate()
               // 끌 때는 읽던 것 바로 멈춤, 켜면 지금 질문을 다시 읽어줌
               if (sound && 'speechSynthesis' in window) speechSynthesis.cancel()
               setSound(!sound)
@@ -193,7 +201,7 @@ export function StartPage() {
             <span className="text-green-800">{step + 1}</span>{' '}
             <span className="text-gray-400 font-bold">/ {steps.length}</span>
           </span>
-          <p className="min-w-0 text-xl font-bold text-green-800 break-keep truncate">
+          <p className="min-w-0 text-xl font-bold text-gray-950 break-keep truncate">
             {steps
               .slice(0, step)
               .map((st) => (st.key === 'dineType' ? (sel.dineType.startsWith('포장') ? '포장' : '매장') : sel[st.key]))
@@ -233,7 +241,7 @@ export function StartPage() {
             <button onClick={submitText} disabled={!text.trim()} className={PRIMARY}>
               이 메뉴로 할게요
             </button>
-            <button onClick={() => setTyping(false)} className={`${BTN} w-full min-h-[72px] text-2xl bg-white text-gray-950 border-[3px] border-green-800`}>
+            <button onClick={() => { vibrate(); setTyping(false) }} className={`${BTN} w-full min-h-[72px] text-2xl bg-white text-gray-950 border-[3px] border-green-800`}>
               목록에서 고를게요
             </button>
           </div>
@@ -393,7 +401,7 @@ function CameraView({
             다시 시도해주세요.
           </p>
           <button
-            onClick={() => setRetry(retry + 1)}
+            onClick={() => { vibrate(); setRetry(retry + 1) }}
             className={`${BTN} min-h-[72px] px-8 text-2xl bg-green-700 text-white`}
           >
             다시 시도
@@ -407,9 +415,6 @@ function CameraView({
 // camera: 카메라 미리보기(찍기 전) / analyzing: 사진 분석 중 / guiding: 사진 + 박스 안내 / done: 주문 끝
 type Status = 'camera' | 'analyzing' | 'guiding' | 'done'
 type Entry = { step: GuideStep; photo: string } // 지나온 안내 + 그때 찍은 사진
-
-// 보조 기능: 지원될 때만 조용히 실행
-const vibrate = () => navigator.vibrate?.(100)
 
 // 선택 내용 한 줄 요약 (예: "포장 · 라떼 · 카드")
 const summarize = (c: Ctx) =>
@@ -500,6 +505,7 @@ export function GuidePage() {
   // 사진 찍기
   // 화면 카메라가 안 켜졌을 때: 폰이면 폰 기본 카메라 앱으로, PC면 빈 사진으로 목 흐름 진행(시연용)
   const takePhoto = () => {
+    vibrate()
     const img = captureFrame(videoRef.current)
     if (!img && matchMedia('(pointer: coarse)').matches) return captureRef.current?.click()
     analyze(img)
@@ -618,7 +624,7 @@ export function GuidePage() {
             {sound ? '음성 켜짐' : '음성 꺼짐'}
           </button>
         </div>
-        <p className="mt-1 text-xl font-bold text-green-800 leading-tight break-keep">
+        <p className="mt-1 text-xl font-bold text-gray-950 leading-tight break-keep">
           {summarize(ctx)}
         </p>
       </header>
@@ -644,7 +650,7 @@ export function GuidePage() {
           {status === 'camera' ? (
             // 카메라 상태: 칩 자리에 갤러리 버튼 (흰 바탕 + 회색 테두리로 깔끔하게 차등)
             <button
-              onClick={() => fileRef.current?.click()}
+              onClick={() => { vibrate(); fileRef.current?.click() }}
               className="touch-manipulation active:scale-95 transition-transform col-span-2 min-h-[50px] rounded-2xl bg-white text-gray-800 border-2 border-gray-300 text-xl font-extrabold active:bg-gray-100"
             >
               앨범에서 사진 불러오기

@@ -1,4 +1,6 @@
 import type { Ctx } from './pages'
+import { addCoordinateGrid } from './analysisImage'
+import { refineButtonBounds } from './buttonBounds'
 
 // ===== 매장 종류별 메뉴 카테고리 프리셋 =====
 // 텍스트 직접 입력은 금지 규칙이라 '직접 입력' 칩은 넣지 않음
@@ -6,8 +8,8 @@ import type { Ctx } from './pages'
 export const PRESETS: Record<string, string[]> = {
   // 차갑게/따뜻하게는 키오스크에서 나올 때 고르면 됨 (안내 중 확인 질문)
   카페: ['아메리카노', '라떼', '차 / 에이드', '다른 음료'],
-  '햄버거·패스트푸드': ['불고기 / 치즈 버거', '치킨 버거', '새우 버거', '감자튀김 / 사이드'],
-  기타: ['식사', '간식 / 디저트'],
+  '햄버거 / 패스트푸드': ['불고기 / 치즈 버거', '치킨 버거', '새우 버거', '감자튀김 / 사이드'],
+  식당: ['제육', '돈까스'],
 }
 
 // ===== 시작 화면 단계별 선택지 =====
@@ -142,14 +144,18 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
   // 오류로 다시 찍기여도 기억은 유지 (안 그러면 다음 사진에서 누른 내용을 잊음)
   const retakeKeep = (message: string): GuideStep => ({ ...retake(message), stage: prev?.stage, ...keep })
   let res: Response
+  const analysisImage = await addCoordinateGrid(imageBase64)
   try {
     res = await fetch('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        imageBase64,
+        imageBase64: analysisImage,
         mimeType: 'image/jpeg',
-        ctx,
+        ctx: {
+          ...ctx,
+          storeType: ctx.storeType === '식당' ? '기타' : ctx.storeType.startsWith('햄버거') ? '햄버거' : ctx.storeType,
+        },
         previousStage: prev?.stage ?? 'place',
         context: { ...keep, pressed: pressed.length ? pressed : undefined },
       }),
@@ -166,6 +172,10 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
     return retakeKeep(data.error || '화면을 읽지 못했어요. 다시 찍어주세요')
   }
   if (data.kind === 'complete' || data.completed) return null
+  if (data.kind === 'guide' && data.box && data.candidates?.[0]?.label) {
+    data.box = await refineButtonBounds(imageBase64, data.candidates[0].label, data.box)
+    data.candidates[0].box = data.box
+  }
   return {
     kind: data.kind,
     message: data.message,
