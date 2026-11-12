@@ -47,6 +47,11 @@ export function normalizeRequest(data) {
       if (!Array.isArray(input.options) || input.options.length > 10) invalid('옵션은 최대 10개까지 보내 주세요.');
       context.options = input.options.map(value => text(value, 80, '선택 옵션'));
     }
+    // 사용자가 '눌렀어요'로 확인한 버튼 이름 (오래된 순). 이미 누른 메뉴를 또 누르라고 하지 않게 함
+    if (input.pressed !== undefined) {
+      if (!Array.isArray(input.pressed) || input.pressed.length > 10) invalid('누른 버튼은 최대 10개까지 보내 주세요.');
+      context.pressed = input.pressed.map(value => text(value, 80, '누른 버튼'));
+    }
     if (input.clarification !== undefined) {
       if (!object(input.clarification)) invalid('확인 질문과 답변을 함께 보내 주세요.');
       context.clarification = { question: text(input.clarification.question, 300, '확인 질문'), answer: text(input.clarification.answer, 100, '확인 답변') };
