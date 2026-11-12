@@ -42,12 +42,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
 export const useAppCtx = () => useContext(AppContext)
 
 // ===== 공통 버튼 스타일 (진한 녹색 + 흰 글씨, 아이콘 없이 글자만, 파랑/파스텔 안 씀) =====
-const BTN = 'touch-manipulation active:scale-95 rounded-2xl font-extrabold'
+const BTN = 'touch-manipulation active:scale-95 transition-transform rounded-2xl font-extrabold'
 const PRIMARY = `${BTN} min-h-[72px] w-full text-2xl bg-green-800 text-white active:bg-green-900 disabled:bg-gray-300 disabled:text-gray-700`
-// 보조 버튼은 한 단계 얇게(bold) → 질문·안내·메인 버튼이 먼저 보이게
-const SECONDARY = `${BTN.replace('font-extrabold', 'font-bold')} min-h-[60px] text-xl bg-white text-gray-950 border-[3px] border-green-800 active:bg-gray-100 disabled:opacity-40`
-// 맨 위 작은 버튼 (뒤로, 소리) — 사용자 요청으로 60px 규칙 예외
-const SMALL = `${BTN.replace('font-extrabold', 'font-bold')} shrink-0 min-h-[48px] px-3 text-xl border-2 border-green-800 disabled:opacity-40`
 
 const CUSTOM = '직접 입력'
 
@@ -154,90 +150,114 @@ export function StartPage() {
   }
 
   return (
-    // 배경은 아주 연한 회색 → 흰 버튼이 카드처럼 떠 보이게
-    <div className="h-dvh w-full max-w-md mx-auto bg-stone-50 text-gray-950 flex flex-col px-4 pt-4 pb-6">
-      {/* 상단: 이전 + 진행 표시 + 소리 켬/끔 (가이드 화면과 같은 배치) */}
-      <div className="flex items-center justify-between gap-3 min-h-[60px]">
-        <button onClick={goBack} className={`${SMALL} bg-white text-gray-950`}>
-          이전
-        </button>
-        <span className="text-2xl font-bold">
-          {step + 1} / {steps.length}
-        </span>
-        <button
-          onClick={() => {
-            // 끌 때는 읽던 것 바로 멈춤, 켜면 지금 질문을 다시 읽어줌
-            if (sound && 'speechSynthesis' in window) speechSynthesis.cancel()
-            setSound(!sound)
-          }}
-          aria-pressed={sound}
-          className={`${SMALL} ${sound ? 'bg-green-800 text-white' : 'bg-white text-gray-950'}`}
-        >
-          {sound ? '소리 켬' : '소리 끔'}
-        </button>
-      </div>
-
-      {/* 진행 막대 (녹색 = 지난 단계) */}
-      <div className="flex gap-2 mt-4">
-        {steps.map((_, i) => (
-          <div key={i} className={`h-3 flex-1 rounded-full ${i <= step ? 'bg-green-800' : 'bg-gray-300'}`} />
-        ))}
-      </div>
-
-      {/* 지금까지 고른 내용 (첫 단계는 비어 있어도 자리 유지) */}
-      <p className="min-h-[28px] mt-4 text-xl font-bold text-green-800 break-keep">
-        {steps
-          .slice(0, step)
-          .map((st) => (st.key === 'dineType' ? (sel.dineType.startsWith('포장') ? '포장' : '매장') : sel[st.key]))
-          .filter(Boolean)
-          .join(' · ')}
-      </p>
-
-      {/* 질문 */}
-      <h1 className="text-3xl font-extrabold leading-snug mt-3 mb-4 break-keep">
-        {question}
-      </h1>
-
-      {typing ? (
-        // 직접 입력: 모달 없이 같은 화면에서 큰 입력칸 + 확인 버튼
-        <div className="flex flex-col gap-5">
-          <input
-            autoFocus
-            value={text}
-            maxLength={30}
-            enterKeyHint="done"
-            placeholder="예: 김치볶음밥"
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && submitText()}
-            className="min-h-[72px] w-full px-4 bg-white rounded-2xl border-[3px] border-gray-950 text-2xl font-bold placeholder:text-gray-500 outline-none focus:ring-4 focus:ring-green-700"
-          />
-          <button onClick={submitText} disabled={!text.trim()} className={PRIMARY}>
-            이 메뉴로 할게요
+    // 전체 배경은 연한 회색(bg-stone-50), 상단바만 흰색(bg-white)으로 구분
+    <div className="h-dvh w-full max-w-md mx-auto bg-stone-50 text-gray-950 flex flex-col">
+      {/* 흰색 상단바 (슬림형): 1줄(← 이전 / 음성 켜짐) + 2줄(순서 + 바로 오른쪽에 고른 내용) + 3줄(진행 막대) */}
+      <header className="shrink-0 bg-white px-4 pt-2 pb-2.5 border-b border-gray-200">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={goBack}
+            className="touch-manipulation active:scale-95 transition-transform min-h-[36px] pr-2 flex items-center gap-1.5 text-lg font-extrabold text-green-800"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="4 4 16 16" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            이전
           </button>
-          <button onClick={() => setTyping(false)} className={`${BTN} w-full min-h-[72px] text-2xl bg-white text-gray-950 border-[3px] border-green-800`}>
-            목록에서 고를게요
+          <button
+            onClick={() => {
+              // 끌 때는 읽던 것 바로 멈춤, 켜면 지금 질문을 다시 읽어줌
+              if (sound && 'speechSynthesis' in window) speechSynthesis.cancel()
+              setSound(!sound)
+            }}
+            aria-pressed={sound}
+            className={`touch-manipulation active:scale-95 transition-transform min-h-[36px] px-3 py-1 rounded-full border-2 border-green-800 flex items-center gap-1.5 text-lg font-bold ${
+              sound ? 'bg-green-800 text-white' : 'bg-white text-green-800'
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {sound ? (
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+              ) : (
+                <path d="M23 9l-6 6M17 9l6 6" />
+              )}
+            </svg>
+            {sound ? '음성 켜짐' : '음성 꺼짐'}
           </button>
         </div>
-      ) : (
-        // 선택 버튼: 남은 세로 공간을 꽉 채움 (시니어는 스크롤을 잘 안 해서 6개까지 한 화면에 들어가게)
-        <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5">
-          {cur.options.map((opt) => (
-            <button
-              key={opt}
-              onClick={() => choose(opt)}
-              className={`${BTN} flex-1 min-h-[60px] w-full px-4 border-[3px] border-green-800 text-2xl leading-snug break-keep ${
-                picked === opt
-                  ? 'bg-green-800 text-white'
-                  : opt === CUSTOM
-                    ? 'bg-white border-dashed'
-                    : 'bg-white'
-              }`}
-            >
-              {opt}
-            </button>
+
+        {/* 순서(왼쪽) + 바로 오른쪽 옆에 지금까지 고른 내용 */}
+        <div className="flex items-baseline gap-2.5 mt-1 min-h-[26px]">
+          <span className="shrink-0 text-xl font-extrabold">
+            <span className="text-green-800">{step + 1}</span>{' '}
+            <span className="text-gray-400 font-bold">/ {steps.length}</span>
+          </span>
+          <p className="min-w-0 text-xl font-bold text-green-800 break-keep truncate">
+            {steps
+              .slice(0, step)
+              .map((st) => (st.key === 'dineType' ? (sel.dineType.startsWith('포장') ? '포장' : '매장') : sel[st.key]))
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+
+        {/* 진행 막대 (녹색 = 지난 단계) */}
+        <div className="flex gap-2 mt-1.5">
+          {steps.map((_, i) => (
+            <div key={i} className={`h-2 flex-1 rounded-full ${i <= step ? 'bg-green-800' : 'bg-gray-200'}`} />
           ))}
         </div>
-      )}
+      </header>
+
+      {/* 본문 영역 (연한 회색 배경 위 질문 + 흰색 선택 카드) */}
+      <div className="flex-1 min-h-0 flex flex-col px-4 pt-5 pb-6">
+        {/* 질문 */}
+        <h1 className="text-3xl font-extrabold leading-snug mb-4 break-keep">
+          {question}
+        </h1>
+
+        {typing ? (
+          // 직접 입력: 모달 없이 같은 화면에서 큰 입력칸 + 확인 버튼
+          <div className="flex flex-col gap-5">
+            <input
+              autoFocus
+              value={text}
+              maxLength={30}
+              enterKeyHint="done"
+              placeholder="예: 김치볶음밥"
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && submitText()}
+              className="min-h-[72px] w-full px-4 bg-white rounded-2xl border-[3px] border-gray-950 text-2xl font-bold placeholder:text-gray-500 outline-none focus:ring-4 focus:ring-green-700"
+            />
+            <button onClick={submitText} disabled={!text.trim()} className={PRIMARY}>
+              이 메뉴로 할게요
+            </button>
+            <button onClick={() => setTyping(false)} className={`${BTN} w-full min-h-[72px] text-2xl bg-white text-gray-950 border-[3px] border-green-800`}>
+              목록에서 고를게요
+            </button>
+          </div>
+        ) : (
+          // 선택 버튼: 남은 세로 공간을 꽉 채움 (시니어는 스크롤을 잘 안 해서 6개까지 한 화면에 들어가게)
+          <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-5">
+            {cur.options.map((opt) => (
+              <button
+                key={opt}
+                onClick={() => choose(opt)}
+                className={`${BTN} flex-1 min-h-[60px] w-full px-4 border-[3px] border-green-800 text-2xl leading-snug break-keep ${
+                  picked === opt
+                    ? 'bg-green-800 text-white'
+                    : opt === CUSTOM
+                      ? 'bg-white border-dashed'
+                      : 'bg-white'
+                }`}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
@@ -326,7 +346,7 @@ function CameraView({
 
   return (
     // 컨테이너 크기를 기준으로 래퍼가 영상/사진 비율을 유지한 채 최대 크기로 맞춰짐
-    <div className="relative h-full w-full bg-gray-950 flex items-center justify-center [container-type:size]">
+    <div className="relative h-full w-full rounded-2xl overflow-hidden bg-gray-950 flex items-center justify-center [container-type:size]">
       <div
         className="relative max-h-full max-w-full mx-auto"
         style={{ aspectRatio: ratio, width: `min(100cqw, ${ratio * 100}cqh)` }}
@@ -368,11 +388,9 @@ function CameraView({
       {error && !photo && !box && (
         <div className="absolute inset-0 bg-gray-950 text-white flex flex-col items-center justify-center gap-6 p-6 text-center">
           <p className="text-2xl font-extrabold leading-snug break-keep">
-            카메라 화면을 띄울 수 없어요
+            지금은 카메라를 사용할 수 없어요.
             <br />
-            아래 버튼으로 사진을 찍거나
-            <br />
-            불러와주세요
+            다시 시도해주세요.
           </p>
           <button
             onClick={() => setRetry(retry + 1)}
@@ -569,25 +587,44 @@ export function GuidePage() {
 
   return (
     <div className="h-dvh w-full max-w-md mx-auto bg-stone-50 text-gray-950 flex flex-col">
-      {/* 맨 위: 작은 이전/소리 버튼 + 고른 내용 (잘리지 않게 줄바꿈) */}
-      <div className="shrink-0 flex items-start gap-3 px-3 pt-2 pb-2">
-        <button onClick={goBack} disabled={status === 'analyzing'} className={`${SMALL} bg-white text-gray-950`}>
-          이전
-        </button>
-        <p className="flex-1 min-w-0 pt-2 text-xl font-extrabold text-center leading-snug break-keep">
+      {/* 맨 위 흰색 상단바 (슬림형): 1줄(← 이전 / 음성 켜짐) + 2줄(하단에 선택한 요소들) */}
+      <header className="shrink-0 bg-white px-4 pt-2 pb-2 border-b border-gray-200">
+        <div className="flex items-center justify-between gap-3">
+          <button
+            onClick={goBack}
+            disabled={status === 'analyzing'}
+            className="touch-manipulation active:scale-95 transition-transform shrink-0 min-h-[36px] pr-2 flex items-center gap-1.5 text-lg font-extrabold text-green-800 disabled:opacity-40"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="4 4 16 16" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M19 12H5M12 19l-7-7 7-7" />
+            </svg>
+            이전
+          </button>
+          <button
+            onClick={toggleSound}
+            aria-pressed={sound}
+            className={`touch-manipulation active:scale-95 transition-transform shrink-0 min-h-[36px] px-3 py-1 rounded-full border-2 border-green-800 flex items-center gap-1.5 text-lg font-bold ${
+              sound ? 'bg-green-800 text-white' : 'bg-white text-green-800'
+            }`}
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+              {sound ? (
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07M19.07 4.93a10 10 0 0 1 0 14.14" />
+              ) : (
+                <path d="M23 9l-6 6M17 9l6 6" />
+              )}
+            </svg>
+            {sound ? '음성 켜짐' : '음성 꺼짐'}
+          </button>
+        </div>
+        <p className="mt-1 text-xl font-bold text-green-800 leading-tight break-keep">
           {summarize(ctx)}
         </p>
-        <button
-          onClick={toggleSound}
-          aria-pressed={sound}
-          className={`${SMALL} ${sound ? 'bg-green-800 text-white' : 'bg-white text-gray-950'}`}
-        >
-          {sound ? '소리 켬' : '소리 끔'}
-        </button>
-      </div>
+      </header>
 
-      {/* 가운데: 카메라 / 찍은 사진 (남는 공간 전부), 박스는 안내 중일 때만 */}
-      <div className="flex-1 min-h-0">
+      {/* 가운데: 카메라 / 찍은 사진 (최대한 크게 확보), 박스는 안내 중일 때만 */}
+      <div className="flex-1 min-h-0 px-4 pt-2 pb-1">
         <CameraView
           photo={shownPhoto}
           box={status === 'guiding' && cur ? cur.box : null}
@@ -595,19 +632,22 @@ export function GuidePage() {
         />
       </div>
 
-      {/* 하단: 안내 문구(최대 3줄) → 칩 줄(최대 2개) → 메인 버튼 1개 */}
-      <div className="shrink-0 p-4 flex flex-col gap-4">
+      {/* 하단: 별도 흰색 바 없이 회색 바탕에 바로 문구 + 버튼 배치 (높이 줄여서 카메라 영역 확대) */}
+      <div className="shrink-0 px-4 pt-1 pb-3 flex flex-col gap-2">
         <p
-          className={`min-h-[64px] text-2xl font-extrabold leading-8 line-clamp-3 break-keep ${warn ? 'text-red-700' : ''}`}
+          className={`min-h-[36px] flex items-center text-2xl font-extrabold leading-snug line-clamp-2 break-keep ${warn ? 'text-red-700' : ''}`}
         >
           {message}
         </p>
         {/* 칩이 없어도 자리를 유지해서 카메라 크기가 출렁이지 않게 함 */}
-        <div className="grid grid-cols-2 gap-4 h-[60px]">
+        <div className="grid grid-cols-2 gap-2.5 h-[50px]">
           {status === 'camera' ? (
-            // 카메라 상태: 칩 자리에 갤러리 버튼
-            <button onClick={() => fileRef.current?.click()} className={`${SECONDARY} col-span-2`}>
-              사진 불러오기
+            // 카메라 상태: 칩 자리에 갤러리 버튼 (흰 바탕 + 회색 테두리로 깔끔하게 차등)
+            <button
+              onClick={() => fileRef.current?.click()}
+              className="touch-manipulation active:scale-95 transition-transform col-span-2 min-h-[50px] rounded-2xl bg-white text-gray-800 border-2 border-gray-300 text-xl font-extrabold active:bg-gray-100"
+            >
+              앨범에서 사진 불러오기
             </button>
           ) : kind === 'action' ? (
             // 기기에서 하는 행동: 버튼처럼 보이지 않게 글자만 (화면 누르기와 구분)
@@ -619,7 +659,7 @@ export function GuidePage() {
               <button
                 key={c}
                 onClick={() => onChip(c)}
-                className={`${BTN} min-h-[60px] px-2 text-xl leading-tight break-keep border-[3px] border-green-800 ${
+                className={`${BTN} min-h-[50px] px-2 text-xl leading-tight break-keep border-[3px] border-green-800 ${
                   isAsk ? 'bg-green-800 text-white' : 'bg-white active:bg-gray-100'
                 }`}
               >
@@ -632,11 +672,11 @@ export function GuidePage() {
         <button
           onClick={action.onClick}
           disabled={status === 'analyzing' || isAsk}
-          className={
+          className={`${BTN} min-h-[60px] w-full text-2xl bg-green-800 text-white active:bg-green-900 ${
             status === 'analyzing'
-              ? PRIMARY.replace('disabled:bg-gray-300 disabled:text-gray-700', 'disabled:bg-[#5b7a66] disabled:text-white') // 기존 녹색의 채도만 낮춘 색 (흰 글씨 대비 4.7:1)
-              : PRIMARY
-          }
+              ? 'disabled:bg-[#5b7a66] disabled:text-white' // 기존 녹색의 채도만 낮춘 색 (흰 글씨 대비 4.7:1)
+              : 'disabled:bg-gray-300 disabled:text-gray-700'
+          }`}
         >
           {action.label}
         </button>
