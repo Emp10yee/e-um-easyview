@@ -7,7 +7,7 @@ export const PRESETS: Record<string, string[]> = {
   // 차갑게/따뜻하게는 키오스크에서 나올 때 고르면 됨 (안내 중 확인 질문)
   카페: ['아메리카노', '라떼', '차 / 에이드', '다른 음료'],
   '햄버거·패스트푸드': ['불고기 / 치즈 버거', '치킨 버거', '새우 버거', '감자튀김 / 사이드'],
-  기타: ['식사', '간식 / 디저트'],
+  식당: ['제육', '돈까스'],
 }
 
 // ===== 시작 화면 단계별 선택지 =====
@@ -149,7 +149,7 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
       body: JSON.stringify({
         imageBase64,
         mimeType: 'image/jpeg',
-        ctx,
+        ctx: { ...ctx, storeType: ctx.storeType === '식당' ? '기타' : ctx.storeType },
         previousStage: prev?.stage ?? 'place',
         context: { ...keep, pressed: pressed.length ? pressed : undefined },
       }),

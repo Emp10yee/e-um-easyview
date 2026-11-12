@@ -193,7 +193,7 @@ export function StartPage() {
             <span className="text-green-800">{step + 1}</span>{' '}
             <span className="text-gray-400 font-bold">/ {steps.length}</span>
           </span>
-          <p className="min-w-0 text-xl font-bold text-green-800 break-keep truncate">
+          <p className="min-w-0 text-xl font-bold text-gray-950 break-keep truncate">
             {steps
               .slice(0, step)
               .map((st) => (st.key === 'dineType' ? (sel.dineType.startsWith('포장') ? '포장' : '매장') : sel[st.key]))
@@ -618,7 +618,7 @@ export function GuidePage() {
             {sound ? '음성 켜짐' : '음성 꺼짐'}
           </button>
         </div>
-        <p className="mt-1 text-xl font-bold text-green-800 leading-tight break-keep">
+        <p className="mt-1 text-xl font-bold text-gray-950 leading-tight break-keep">
           {summarize(ctx)}
         </p>
       </header>
