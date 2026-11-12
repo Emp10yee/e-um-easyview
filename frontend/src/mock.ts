@@ -140,7 +140,7 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
   const pressed = [...(prev?.pressed ?? []), ...(prev?.kind === 'guide' && prev.target ? [prev.target] : [])].slice(-10)
   const keep = { selectedMenu: prev?.selectedMenu, clarification: clarification ?? prev?.clarification, pressed }
   // 오류로 다시 찍기여도 기억은 유지 (안 그러면 다음 사진에서 누른 내용을 잊음)
-  const retakeKeep = (message: string): GuideStep => ({ ...retake(message), ...keep })
+  const retakeKeep = (message: string): GuideStep => ({ ...retake(message), stage: prev?.stage, ...keep })
   let res: Response
   try {
     res = await fetch('/api/analyze', {
@@ -172,7 +172,7 @@ async function callApi(imageBase64: string, ctx: Ctx, prev: GuideStep | undefine
     box: data.box ?? null,
     alternatives: data.alternatives ?? [],
     choices: data.choices,
-    stage: data.stage,
+    stage: data.kind === 'retake' ? (prev?.stage ?? data.stage) : data.stage,
     targets: data.candidates ?? [],
     target: data.candidates?.[0]?.label,
     ...keep,
@@ -195,8 +195,8 @@ export async function answerClarification(step: GuideStep, choice: string, image
   if (!step.mock) {
     try {
       const next = await callApi(imageBase64, ctx, step, { question: step.message, answer: choice })
-      // 질문에 답했는데 끝났다고 오는 경우는 거의 없음 → 다시 찍기로 안내
-      return next ?? retake('다음 화면을 찍어주세요')
+      // 질문에 답했는데 끝났다고 오는 경우는 거의 없음 → 기억 유지한 채 다시 찍기로 안내
+      return next ?? { ...step, ...retake('다음 화면을 찍어주세요'), clarification: { question: step.message, answer: choice } }
     } catch {}
   }
   await wait(500)

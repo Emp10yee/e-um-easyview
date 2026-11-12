@@ -27,7 +27,14 @@ const AppContext = createContext<{
 }>({ ctx: EMPTY_CTX, setCtx: () => {}, sound: true, setSound: () => {} })
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [ctx, setCtx] = useState<Ctx>(EMPTY_CTX)
+  // 새로고침·카메라 앱 복귀 시에도 고른 설정이 날아가지 않게 sessionStorage에 유지
+  const [ctx, setCtxState] = useState<Ctx>(() => {
+    try { return JSON.parse(sessionStorage.getItem('ctx') || '') } catch { return EMPTY_CTX }
+  })
+  const setCtx = (c: Ctx) => {
+    setCtxState(c)
+    try { sessionStorage.setItem('ctx', JSON.stringify(c)) } catch {}
+  }
   const [sound, setSound] = useState(true) // 음성 안내 기본 켬
   return <AppContext.Provider value={{ ctx, setCtx, sound, setSound }}>{children}</AppContext.Provider>
 }
@@ -407,6 +414,11 @@ export function GuidePage() {
   const [pending, setPending] = useState('') // 분석 중인(또는 마지막) 사진
   const last = history[history.length - 1]
   const cur = last?.step
+
+  // 설정 없이 바로 /guide로 들어온 경우 설정 화면으로 이동
+  useEffect(() => {
+    if (!ctx.category) navigate('/setup', { replace: true })
+  }, [ctx.category, navigate])
 
   // 화면 꺼짐 방지 (지원될 때만)
   // 카메라 앱·갤러리에 다녀오면 자동으로 풀리므로 화면이 다시 보일 때 재요청
